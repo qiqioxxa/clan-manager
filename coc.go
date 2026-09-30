@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -124,21 +125,44 @@ func (client *CoCClient) GetClanMembers(clanTag string) ([]ClanMember, error) {
 }
 
 func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, error) {
-	players := make([]Player, 0, len(clanMembers))
+	players := make([]Player, len(clanMembers))
 
-	for _, member := range clanMembers {
-		var player Player
-		endpoint := fmt.Sprintf("v1/players/%s", member.Tag)
+	const maxConcurrency = 10
+	sem := make(chan struct{}, maxConcurrency)
 
-		err := client.doRequest(endpoint, &player)
-		if err != nil {
-			return nil, err
-		}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
 
-		player.calculateSums()
-		player.processAchievements()
+	for i, member := range clanMembers {
+		wg.Go(func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-		players = append(players, player)
+			endpoint := fmt.Sprintf("v1/players/%s", member.Tag)
+			var player Player
+
+			err := client.doRequest(endpoint, &player)
+			if err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = fmt.Errorf("failed to fetch player %s: %w", member.Tag, err)
+				}
+				mu.Unlock()
+				return
+			}
+
+			player.calculateSums()
+			player.processAchievements()
+
+			players[i] = player
+		})
+	}
+
+	wg.Wait()
+
+	if firstErr != nil {
+		return nil, firstErr
 	}
 
 	return players, nil
