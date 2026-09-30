@@ -17,13 +17,28 @@ type ClanMember struct {
 }
 
 type Player struct {
-	Tag      string  `json:"tag"`
-	Name     string  `json:"name"`
-	TownHall int     `json:"townHallLevel"`
-	WarStars int     `json:"warStars"`
-	Heroes   []Hero  `json:"heroes"`
-	Troops   []Troop `json:"troops"`
-	Spells   []Spell `json:"spells"`
+	Tag                      string        `json:"tag"`
+	Name                     string        `json:"name"`
+	TownHall                 int           `json:"townHallLevel"`
+	WarStars                 int           `json:"warStars"`
+	ClanCapitalContributions int           `json:"clanCapitalContributions"`
+	Achievements             []Achievement `json:"achievements"`
+	Heroes                   []Hero        `json:"heroes"`
+	Troops                   []Troop       `json:"troops"`
+	Spells                   []Spell       `json:"spells"`
+
+	HeroSum              int `json:"-"`
+	EquipmentSum         int `json:"-"`
+	TroopSum             int `json:"-"`
+	SpellSum             int `json:"-"`
+	TotalDonations       int `json:"-"`
+	TotalClanGamesPoints int `json:"-"`
+	TotalWarLeagueStars  int `json:"-"`
+}
+
+type Achievement struct {
+	Name  string `json:"name"`
+	Value int    `json:"value"`
 }
 
 type Hero struct {
@@ -120,8 +135,53 @@ func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, err
 			return nil, err
 		}
 
+		player.calculateSums()
+		player.processAchievements()
+
 		players = append(players, player)
 	}
 
 	return players, nil
+}
+
+func (p *Player) calculateSums() {
+	p.HeroSum = 0
+	p.EquipmentSum = 0
+	p.TroopSum = 0
+	p.SpellSum = 0
+
+	for _, hero := range p.Heroes {
+		if hero.Village == "home" {
+			p.HeroSum += hero.Level
+			for _, equipment := range hero.Equipment {
+				p.EquipmentSum += equipment.Level
+			}
+		}
+	}
+
+	for _, troop := range p.Troops {
+		if troop.Village == "home" {
+			p.TroopSum += troop.Level
+		}
+	}
+
+	for _, spell := range p.Spells {
+		if spell.Village == "home" {
+			p.SpellSum += spell.Level
+		}
+	}
+}
+
+func (p *Player) processAchievements() {
+	for _, a := range p.Achievements {
+		switch a.Name {
+		case "Friend in Need":
+			p.TotalDonations = a.Value
+		case "Games Champion":
+			p.TotalClanGamesPoints = a.Value
+		case "War League Legend":
+			p.TotalWarLeagueStars = a.Value
+		}
+	}
+	p.Achievements = nil
 }
