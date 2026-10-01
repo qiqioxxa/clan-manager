@@ -28,13 +28,12 @@ type Player struct {
 	Troops                   []Troop       `json:"troops"`
 	Spells                   []Spell       `json:"spells"`
 
-	HeroSum              int `json:"-"`
-	EquipmentSum         int `json:"-"`
-	TroopSum             int `json:"-"`
-	SpellSum             int `json:"-"`
-	TotalDonations       int `json:"-"`
-	TotalClanGamesPoints int `json:"-"`
-	TotalWarLeagueStars  int `json:"-"`
+	HeroSum         int `json:"-"`
+	EquipmentSum    int `json:"-"`
+	LabUpdates      int `json:"-"`
+	Donations       int `json:"-"`
+	ClanGamesPoints int `json:"-"`
+	WarLeagueStars  int `json:"-"`
 }
 
 type Achievement struct {
@@ -76,7 +75,7 @@ func NewCoCClient(token string) *CoCClient {
 	return &CoCClient{
 		token: token,
 		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
+			Timeout: 20 * time.Second,
 		},
 	}
 }
@@ -171,8 +170,7 @@ func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, err
 func (p *Player) calculateSums() {
 	p.HeroSum = 0
 	p.EquipmentSum = 0
-	p.TroopSum = 0
-	p.SpellSum = 0
+	p.LabUpdates = 0
 
 	for _, hero := range p.Heroes {
 		if hero.Village == "home" {
@@ -185,13 +183,13 @@ func (p *Player) calculateSums() {
 
 	for _, troop := range p.Troops {
 		if troop.Village == "home" {
-			p.TroopSum += troop.Level
+			p.LabUpdates += troop.Level - 1
 		}
 	}
 
 	for _, spell := range p.Spells {
 		if spell.Village == "home" {
-			p.SpellSum += spell.Level
+			p.LabUpdates += spell.Level - 1
 		}
 	}
 }
@@ -200,11 +198,11 @@ func (p *Player) processAchievements() {
 	for _, a := range p.Achievements {
 		switch a.Name {
 		case "Friend in Need":
-			p.TotalDonations = a.Value
+			p.Donations = a.Value
 		case "Games Champion":
-			p.TotalClanGamesPoints = a.Value
+			p.ClanGamesPoints = a.Value
 		case "War League Legend":
-			p.TotalWarLeagueStars = a.Value
+			p.WarLeagueStars = a.Value
 		}
 	}
 	p.Achievements = nil
