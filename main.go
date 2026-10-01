@@ -32,8 +32,6 @@ func main() {
 		var result int
 
 		switch cfg.SortBy {
-		case ByTag:
-			result = cmp.Compare(a.Tag, b.Tag)
 		case ByName:
 			result = cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 		case ByTownHall:
@@ -42,6 +40,8 @@ func main() {
 			result = cmp.Compare(a.WarStars, b.WarStars)
 		case ByCapitalContributions:
 			result = cmp.Compare(a.ClanCapitalContributions, b.ClanCapitalContributions)
+		case ByHeroSum:
+			result = cmp.Compare(a.HeroSum, b.HeroSum)
 		case ByEquipmentSum:
 			result = cmp.Compare(a.EquipmentSum, b.EquipmentSum)
 		case ByLabUpdates:
@@ -52,10 +52,8 @@ func main() {
 			result = cmp.Compare(a.ClanGamesPoints, b.ClanGamesPoints)
 		case ByWarLeagueStars:
 			result = cmp.Compare(a.WarLeagueStars, b.WarLeagueStars)
-		case ByHeroSum:
-			fallthrough
 		default:
-			result = cmp.Compare(a.HeroSum, b.HeroSum)
+			result = cmp.Compare(a.TownHall, b.TownHall)
 		}
 
 		if !cfg.Ascending {
@@ -64,15 +62,16 @@ func main() {
 		return result
 	})
 
-	fmt.Printf("Fetched %d players info\n", len(clanMembers))
+	fmt.Printf("Fetched %d players info\n", len(players))
+
+	formatter := presets[cfg.Preset]
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 
-	t.AppendHeader(table.Row{"ID", "Name", "Townhall", "Hero sum", "CW+CWL stars", "CWL stars", "Donations", "Equip sum", "Lab updates"})
-
+	t.AppendHeader(formatter.Header)
 	for i, player := range players {
-		t.AppendRow(table.Row{i + 1, player.Name, player.TownHall, player.HeroSum, player.WarStars, player.WarLeagueStars, player.Donations, player.EquipmentSum, player.LabUpdates})
+		t.AppendRow(formatter.GenerateRow(i+1, player))
 	}
 
 	t.Render()

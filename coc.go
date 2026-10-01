@@ -207,3 +207,15 @@ func (p *Player) processAchievements() {
 	}
 	p.Achievements = nil
 }
+
+func (p *Player) ProgressionScore() int {
+	return 0
+}
+
+func (p *Player) ClanWarScore() int {
+	return 0
+}
+
+func (p *Player) ClanWarLeagueScore() int {
+	return 0
+}
