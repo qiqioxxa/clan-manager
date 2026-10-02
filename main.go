@@ -28,6 +28,30 @@ func main() {
 		log.Fatalf("Failed to fetch players info: %v", err)
 	}
 
+	fmt.Printf("Fetched %d players info\n", len(players))
+
+	sortPlayers(&cfg, players)
+
+	formatter := modes[cfg.Mode]
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(formatter.Header)
+
+	totalScore := 0
+	for i, player := range players {
+		t.AppendRow(formatter.GenerateRow(i+1, player))
+		totalScore += player.Score(cfg.Mode)
+	}
+
+	t.Render()
+
+	if cfg.Mode == Progression || cfg.Mode == ClanWar || cfg.Mode == ClanWarLeague {
+		fmt.Printf("Total clan %s score: %d, avg = %d\n", cfg.Mode, totalScore, totalScore/len(players))
+	}
+}
+
+func sortPlayers(cfg *Config, players []Player) {
 	slices.SortFunc(players, func(a, b Player) int {
 		var result int
 
@@ -52,6 +76,8 @@ func main() {
 			result = cmp.Compare(a.ClanGamesPoints, b.ClanGamesPoints)
 		case ByWarLeagueStars:
 			result = cmp.Compare(a.WarLeagueStars, b.WarLeagueStars)
+		case ByScore:
+			result = cmp.Compare(a.Score(cfg.Mode), b.Score(cfg.Mode))
 		default:
 			result = cmp.Compare(a.TownHall, b.TownHall)
 		}
@@ -61,18 +87,4 @@ func main() {
 		}
 		return result
 	})
-
-	fmt.Printf("Fetched %d players info\n", len(players))
-
-	formatter := presets[cfg.Preset]
-
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-
-	t.AppendHeader(formatter.Header)
-	for i, player := range players {
-		t.AppendRow(formatter.GenerateRow(i+1, player))
-	}
-
-	t.Render()
 }
