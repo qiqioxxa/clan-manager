@@ -9,63 +9,6 @@ import (
 	"time"
 )
 
-type ClanMembersResponse struct {
-	Items []ClanMember `json:"items"`
-}
-
-type ClanMember struct {
-	Tag string `json:"tag"`
-}
-
-type Player struct {
-	Tag                      string        `json:"tag"`
-	Name                     string        `json:"name"`
-	TownHall                 int           `json:"townHallLevel"`
-	WarStars                 int           `json:"warStars"`
-	ClanCapitalContributions int           `json:"clanCapitalContributions"`
-	Achievements             []Achievement `json:"achievements"`
-	Heroes                   []Hero        `json:"heroes"`
-	Troops                   []Troop       `json:"troops"`
-	Spells                   []Spell       `json:"spells"`
-
-	HeroSum         int `json:"-"`
-	EquipmentSum    int `json:"-"`
-	LabUpdates      int `json:"-"`
-	Donations       int `json:"-"`
-	ClanGamesPoints int `json:"-"`
-	WarLeagueStars  int `json:"-"`
-}
-
-type Achievement struct {
-	Name  string `json:"name"`
-	Value int    `json:"value"`
-}
-
-type Hero struct {
-	Name      string      `json:"name"`
-	Level     int         `json:"level"`
-	Village   string      `json:"village"`
-	Equipment []Equipment `json:"equipment"`
-}
-
-type Equipment struct {
-	Name    string `json:"name"`
-	Level   int    `json:"level"`
-	Village string `json:"village"`
-}
-
-type Troop struct {
-	Name    string `json:"name"`
-	Level   int    `json:"level"`
-	Village string `json:"village"`
-}
-
-type Spell struct {
-	Name    string `json:"name"`
-	Level   int    `json:"level"`
-	Village string `json:"village"`
-}
-
 type CoCClient struct {
 	token      string
 	httpClient *http.Client
@@ -80,37 +23,6 @@ func NewCoCClient(token string) *CoCClient {
 	}
 }
 
-func (client *CoCClient) doRequest(endpoint string, target any) error {
-	reqURL, err := url.JoinPath("https://api.clashofclans.com", endpoint)
-	if err != nil {
-		return fmt.Errorf("failed to construct request URL: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+client.token)
-
-	resp, err := client.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("network request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API request failed with status code: %s", resp.Status)
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(target)
-	if err != nil {
-		return fmt.Errorf("failed to decode JSON response: %w", err)
-	}
-
-	return nil
-}
-
 func (client *CoCClient) GetClanMembers(clanTag string) ([]ClanMember, error) {
 	var response ClanMembersResponse
 	endpoint := fmt.Sprintf("v1/clans/%s/members", clanTag)
@@ -122,7 +34,6 @@ func (client *CoCClient) GetClanMembers(clanTag string) ([]ClanMember, error) {
 
 	return response.Items, nil
 }
-
 func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, error) {
 	players := make([]Player, len(clanMembers))
 
@@ -166,6 +77,86 @@ func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, err
 
 	return players, nil
 }
+func (client *CoCClient) doRequest(endpoint string, target any) error {
+	reqURL, err := url.JoinPath("https://api.clashofclans.com", endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to construct request URL: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+client.token)
+
+	resp, err := client.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("network request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API request failed with status code: %s", resp.Status)
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(target)
+	if err != nil {
+		return fmt.Errorf("failed to decode JSON response: %w", err)
+	}
+
+	return nil
+}
+
+type ClanMembersResponse struct {
+	Items []ClanMember `json:"items"`
+}
+type ClanMember struct {
+	Tag string `json:"tag"`
+}
+type Player struct {
+	Tag                      string        `json:"tag"`
+	Name                     string        `json:"name"`
+	TownHall                 int           `json:"townHallLevel"`
+	WarStars                 int           `json:"warStars"`
+	ClanCapitalContributions int           `json:"clanCapitalContributions"`
+	Achievements             []Achievement `json:"achievements"`
+	Heroes                   []Hero        `json:"heroes"`
+	Troops                   []Troop       `json:"troops"`
+	Spells                   []Spell       `json:"spells"`
+
+	HeroSum         int `json:"-"`
+	EquipmentSum    int `json:"-"`
+	LabUpdates      int `json:"-"`
+	Donations       int `json:"-"`
+	ClanGamesPoints int `json:"-"`
+	WarLeagueStars  int `json:"-"`
+}
+type Achievement struct {
+	Name  string `json:"name"`
+	Value int    `json:"value"`
+}
+type Hero struct {
+	Name      string      `json:"name"`
+	Level     int         `json:"level"`
+	Village   string      `json:"village"`
+	Equipment []Equipment `json:"equipment"`
+}
+type Equipment struct {
+	Name    string `json:"name"`
+	Level   int    `json:"level"`
+	Village string `json:"village"`
+}
+type Troop struct {
+	Name    string `json:"name"`
+	Level   int    `json:"level"`
+	Village string `json:"village"`
+}
+type Spell struct {
+	Name    string `json:"name"`
+	Level   int    `json:"level"`
+	Village string `json:"village"`
+}
 
 func (p *Player) calculateSums() {
 	p.HeroSum = 0
@@ -193,7 +184,6 @@ func (p *Player) calculateSums() {
 		}
 	}
 }
-
 func (p *Player) processAchievements() {
 	for _, a := range p.Achievements {
 		switch a.Name {
@@ -220,12 +210,10 @@ func (p *Player) Score(mode Mode) int {
 		return 0
 	}
 }
-
 func (p *Player) progressionScore() int {
 	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
 	return weightedSum / 8
 }
-
 func (p *Player) clanWarScore() int {
 	maxLimit, okMax := heroSumLimits[p.TownHall]
 	minLimit, okMin := heroSumLimits[p.TownHall-3]
@@ -254,7 +242,6 @@ func (p *Player) clanWarScore() int {
 
 	return int(score)
 }
-
 func (p *Player) clanWarLeagueScore() int {
 	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
 	return (weightedSum/8 + p.TownHall*100 + p.WarLeagueStars) / 5
