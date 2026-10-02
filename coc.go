@@ -208,14 +208,69 @@ func (p *Player) processAchievements() {
 	p.Achievements = nil
 }
 
-func (p *Player) ProgressionScore() int {
-	return 0
+func (p *Player) Score(mode Mode) int {
+	switch mode {
+	case Progression:
+		return p.progressionScore()
+	case ClanWar:
+		return p.clanWarScore()
+	case ClanWarLeague:
+		return p.clanWarLeagueScore()
+	default:
+		return 0
+	}
 }
 
-func (p *Player) ClanWarScore() int {
-	return 0
+func (p *Player) progressionScore() int {
+	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
+	return weightedSum / 8
 }
 
-func (p *Player) ClanWarLeagueScore() int {
-	return 0
+func (p *Player) clanWarScore() int {
+	maxLimit, okMax := heroSumLimits[p.TownHall]
+	minLimit, okMin := heroSumLimits[p.TownHall-3]
+
+	if !okMax {
+		maxLimit = p.TownHall * 25
+	}
+	if !okMin {
+		minLimit = 0
+	}
+
+	threeTownhallRange := maxLimit - minLimit
+	if threeTownhallRange == 0 {
+		threeTownhallRange = 1
+	}
+
+	rushCoef := float64(p.HeroSum-minLimit) / float64(threeTownhallRange)
+
+	if rushCoef < 0.0 {
+		rushCoef = 0.0
+	}
+
+	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
+
+	score := (float64(weightedSum) + float64(p.WarStars*5)) * rushCoef / float64(p.TownHall)
+
+	return int(score)
+}
+
+func (p *Player) clanWarLeagueScore() int {
+	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
+	return (weightedSum/8 + p.TownHall*100 + p.WarLeagueStars) / 5
+}
+
+var heroSumLimits = map[int]int{
+	7:  10,
+	8:  30,
+	9:  70,
+	10: 100,
+	11: 150,
+	12: 210,
+	13: 275,
+	14: 320,
+	15: 365,
+	16: 400,
+	17: 435,
+	18: 465,
 }
