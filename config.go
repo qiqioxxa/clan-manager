@@ -9,6 +9,41 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
+type Config struct {
+	APIToken   string
+	ClanTag    string
+	Mode       Mode
+	SortBy     SortColumn
+	Ascending  bool
+	OutputFile string
+}
+
+func parseFlags() (Config, error) {
+	var cfg Config
+
+	cfg.Mode = All
+	cfg.SortBy = ByScore
+
+	flag.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
+	flag.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
+	flag.Var(&cfg.Mode, "mode", "Choose table mode: progression, activity, cw, cwl, all")
+	flag.Var(&cfg.SortBy, "sort", "Sort by column: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score")
+	flag.BoolVar(&cfg.Ascending, "asc", false, "Sorting in ascending order")
+	flag.StringVar(&cfg.OutputFile, "out", "clan_stats.xlsx", "Output Excel file")
+
+	flag.Parse()
+
+	if cfg.APIToken == "" || cfg.ClanTag == "" {
+		return Config{}, errors.New("-token and -tag flags are required")
+	}
+
+	if cfg.SortBy == ByScore && cfg.Mode != Progression && cfg.Mode != ClanWar && cfg.Mode != ClanWarLeague {
+		cfg.SortBy = ByTownHall
+	}
+
+	return cfg, nil
+}
+
 type Mode string
 
 const (
@@ -29,6 +64,35 @@ func (p *Mode) Set(val string) error {
 		return nil
 	default:
 		return fmt.Errorf("invalid table mode %q (allowed: progression, activity, cw, cwl, all)", val)
+	}
+}
+
+type SortColumn string
+
+const (
+	ByName                 SortColumn = "name"
+	ByTownHall             SortColumn = "th"
+	ByWarStars             SortColumn = "cw"
+	ByCapitalContributions SortColumn = "capital"
+	ByHeroSum              SortColumn = "herosum"
+	ByEquipmentSum         SortColumn = "equipsum"
+	ByLabUpdates           SortColumn = "lab"
+	ByDonations            SortColumn = "donations"
+	ByClanGamesPoints      SortColumn = "clangames"
+	ByWarLeagueStars       SortColumn = "cwl"
+	ByScore                SortColumn = "score"
+)
+
+func (s *SortColumn) String() string {
+	return string(*s)
+}
+func (s *SortColumn) Set(val string) error {
+	switch SortColumn(strings.ToLower(val)) {
+	case ByName, ByTownHall, ByWarStars, ByCapitalContributions, ByHeroSum, ByEquipmentSum, ByLabUpdates, ByDonations, ByClanGamesPoints, ByWarLeagueStars, ByScore:
+		*s = SortColumn(strings.ToLower(val))
+		return nil
+	default:
+		return fmt.Errorf("invalid sort column %q (allowed: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score)", val)
 	}
 }
 
@@ -68,68 +132,4 @@ var modes = map[Mode]ModeFormatter{
 			return table.Row{id, p.Name, p.TownHall, p.HeroSum, p.EquipmentSum, p.LabUpdates, p.WarStars, p.WarLeagueStars, p.Donations, p.ClanGamesPoints, p.ClanCapitalContributions}
 		},
 	},
-}
-
-type SortColumn string
-
-const (
-	ByName                 SortColumn = "name"
-	ByTownHall             SortColumn = "th"
-	ByWarStars             SortColumn = "cw"
-	ByCapitalContributions SortColumn = "capital"
-	ByHeroSum              SortColumn = "herosum"
-	ByEquipmentSum         SortColumn = "equipsum"
-	ByLabUpdates           SortColumn = "lab"
-	ByDonations            SortColumn = "donations"
-	ByClanGamesPoints      SortColumn = "clangames"
-	ByWarLeagueStars       SortColumn = "cwl"
-	ByScore                SortColumn = "score"
-)
-
-func (s *SortColumn) String() string {
-	return string(*s)
-}
-func (s *SortColumn) Set(val string) error {
-	switch SortColumn(strings.ToLower(val)) {
-	case ByName, ByTownHall, ByWarStars, ByCapitalContributions, ByHeroSum, ByEquipmentSum, ByLabUpdates, ByDonations, ByClanGamesPoints, ByWarLeagueStars, ByScore:
-		*s = SortColumn(strings.ToLower(val))
-		return nil
-	default:
-		return fmt.Errorf("invalid sort column %q (allowed: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score)", val)
-	}
-}
-
-type Config struct {
-	APIToken   string
-	ClanTag    string
-	Mode       Mode
-	SortBy     SortColumn
-	Ascending  bool
-	OutputFile string
-}
-
-func parseFlags() (Config, error) {
-	var cfg Config
-
-	cfg.Mode = All
-	cfg.SortBy = ByScore
-
-	flag.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
-	flag.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
-	flag.Var(&cfg.Mode, "mode", "Choose table mode: progression, activity, cw, cwl, all")
-	flag.Var(&cfg.SortBy, "sort", "Sort by column: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score")
-	flag.BoolVar(&cfg.Ascending, "asc", false, "Sorting in ascending order")
-	flag.StringVar(&cfg.OutputFile, "out", "clan_stats.xlsx", "Output Excel file")
-
-	flag.Parse()
-
-	if cfg.APIToken == "" || cfg.ClanTag == "" {
-		return Config{}, errors.New("-token and -tag flags are required")
-	}
-
-	if cfg.SortBy == ByScore && cfg.Mode != Progression && cfg.Mode != ClanWar && cfg.Mode != ClanWarLeague {
-		cfg.SortBy = ByTownHall
-	}
-
-	return cfg, nil
 }
