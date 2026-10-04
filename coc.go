@@ -240,7 +240,7 @@ func (p *Player) Score(mode Mode) int {
 		return p.progressionScore()
 	case ClanWar:
 		return p.clanWarScore()
-	case ClanWarLeague:
+	case ClanWarLeague, CWLGroup:
 		return p.clanWarLeagueScore()
 	default:
 		return 0

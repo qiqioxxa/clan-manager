@@ -14,7 +14,7 @@ type Config struct {
 	ClanTag    string
 	Mode       Mode
 	SortBy     SortColumn
-	Ascending  bool
+	Reversed   bool
 	OutputFile string
 }
 
@@ -26,22 +26,71 @@ func parseFlags() (Config, error) {
 
 	flag.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
 	flag.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
-	flag.Var(&cfg.Mode, "mode", "Choose table mode: progression, activity, cw, cwl, all")
-	flag.Var(&cfg.SortBy, "sort", "Sort by column: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score")
-	flag.BoolVar(&cfg.Ascending, "asc", false, "Sorting in ascending order")
+	flag.Var(&cfg.Mode, "mode", "Choose table mode: progression, activity, cw, cwl, all, cwlgroup")
+	flag.Var(&cfg.SortBy, "sort", "Sort by column: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score, listed, present")
+	flag.BoolVar(&cfg.Reversed, "r", false, "Reverse sorting order")
 	flag.StringVar(&cfg.OutputFile, "out", "clan_stats.xlsx", "Output Excel file")
 
 	flag.Parse()
 
-	if cfg.APIToken == "" || cfg.ClanTag == "" {
-		return Config{}, errors.New("-token and -tag flags are required")
-	}
-
-	if cfg.SortBy == ByScore && cfg.Mode != Progression && cfg.Mode != ClanWar && cfg.Mode != ClanWarLeague {
-		cfg.SortBy = ByTownHall
+	err := cfg.Validate()
+	if err != nil {
+		return Config{}, err
 	}
 
 	return cfg, nil
+}
+
+func (c *Config) Validate() error {
+	if c.APIToken == "" || c.ClanTag == "" {
+		return errors.New("-token and -tag flags are required")
+	}
+
+	switch c.Mode {
+	case CWLGroup:
+		allowedSort := map[SortColumn]bool{
+			ByName:    true,
+			ByListed:  true,
+			ByPresent: true,
+			ByScore:   true,
+		}
+		if !allowedSort[c.SortBy] {
+			return fmt.Errorf("invalid -sort %q for mode %q (allowed: name, listed, present, score)", c.SortBy, c.Mode)
+		}
+	default:
+		hasScore := c.Mode == Progression || c.Mode == ClanWar || c.Mode == ClanWarLeague
+		if c.SortBy == ByScore && !hasScore {
+			sortExplicitlySet := false
+			flag.Visit(func(f *flag.Flag) {
+				if f.Name == "sort" {
+					sortExplicitlySet = true
+				}
+			})
+			if !sortExplicitlySet {
+				c.SortBy = ByTownHall
+			}
+		}
+
+		allowedSort := map[SortColumn]bool{
+			ByName:                 true,
+			ByTownHall:             true,
+			ByWarStars:             true,
+			ByCapitalContributions: true,
+			ByHeroSum:              true,
+			ByEquipmentSum:         true,
+			ByLabUpdates:           true,
+			ByDonations:            true,
+			ByClanGamesPoints:      true,
+			ByWarLeagueStars:       true,
+			ByScore:                hasScore,
+		}
+
+		if !allowedSort[c.SortBy] {
+			return fmt.Errorf("invalid -sort %q for mode %q (allowed: name, th, cw, capital, herosum, equipsum, lab, donations, clangames, cwl)", c.SortBy, c.Mode)
+		}
+	}
+
+	return nil
 }
 
 type Mode string
@@ -52,6 +101,7 @@ const (
 	ClanWar       Mode = "cw"
 	ClanWarLeague Mode = "cwl"
 	All           Mode = "all"
+	CWLGroup      Mode = "cwlgroup"
 )
 
 func (p *Mode) String() string {
@@ -59,11 +109,11 @@ func (p *Mode) String() string {
 }
 func (p *Mode) Set(val string) error {
 	switch Mode(strings.ToLower(val)) {
-	case Progression, Activity, ClanWar, ClanWarLeague, All:
+	case Progression, Activity, ClanWar, ClanWarLeague, All, CWLGroup:
 		*p = Mode(strings.ToLower(val))
 		return nil
 	default:
-		return fmt.Errorf("invalid table mode %q (allowed: progression, activity, cw, cwl, all)", val)
+		return fmt.Errorf("invalid table mode %q (allowed: progression, activity, cw, cwl, all, cwlgroup)", val)
 	}
 }
 
@@ -81,6 +131,8 @@ const (
 	ByClanGamesPoints      SortColumn = "clangames"
 	ByWarLeagueStars       SortColumn = "cwl"
 	ByScore                SortColumn = "score"
+	ByListed               SortColumn = "listed"
+	ByPresent              SortColumn = "present"
 )
 
 func (s *SortColumn) String() string {
@@ -88,7 +140,7 @@ func (s *SortColumn) String() string {
 }
 func (s *SortColumn) Set(val string) error {
 	switch SortColumn(strings.ToLower(val)) {
-	case ByName, ByTownHall, ByWarStars, ByCapitalContributions, ByHeroSum, ByEquipmentSum, ByLabUpdates, ByDonations, ByClanGamesPoints, ByWarLeagueStars, ByScore:
+	case ByName, ByTownHall, ByWarStars, ByCapitalContributions, ByHeroSum, ByEquipmentSum, ByLabUpdates, ByDonations, ByClanGamesPoints, ByWarLeagueStars, ByScore, ByListed, ByPresent:
 		*s = SortColumn(strings.ToLower(val))
 		return nil
 	default:
@@ -96,12 +148,12 @@ func (s *SortColumn) Set(val string) error {
 	}
 }
 
-type ModeFormatter struct {
+type RosterFormatter struct {
 	Header      table.Row
 	GenerateRow func(id int, p Player) table.Row
 }
 
-var modes = map[Mode]ModeFormatter{
+var rosterFormatters = map[Mode]RosterFormatter{
 	Progression: {
 		Header: table.Row{"ID", "Name", "Townhall", "Hero sum", "Equip sum", "Lab updates", "Progress score"},
 		GenerateRow: func(id int, p Player) table.Row {
