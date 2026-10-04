@@ -12,6 +12,7 @@ import (
 type CoCClient struct {
 	token      string
 	httpClient *http.Client
+	sem        chan struct{}
 }
 
 func NewCoCClient(token string) *CoCClient {
@@ -20,9 +21,32 @@ func NewCoCClient(token string) *CoCClient {
 		httpClient: &http.Client{
 			Timeout: 20 * time.Second,
 		},
+		sem: make(chan struct{}, 10),
 	}
 }
 
+func (client *CoCClient) GetLeagueGroup(clanTag string) (LeagueGroupResponse, error) {
+	var response LeagueGroupResponse
+	endpoint := fmt.Sprintf("v1/clans/%s/currentwar/leaguegroup", clanTag)
+
+	err := client.doRequest(endpoint, &response)
+	if err != nil {
+		return LeagueGroupResponse{}, err
+	}
+
+	return response, nil
+}
+func (client *CoCClient) GetWarInfo(warTag string) (War, error) {
+	var war War
+	endpoint := fmt.Sprintf("v1/clanwarleagues/wars/%s", warTag)
+
+	err := client.doRequest(endpoint, &war)
+	if err != nil {
+		return War{}, err
+	}
+
+	return war, nil
+}
 func (client *CoCClient) GetClanMembers(clanTag string) ([]ClanMember, error) {
 	var response ClanMembersResponse
 	endpoint := fmt.Sprintf("v1/clans/%s/members", clanTag)
@@ -37,18 +61,12 @@ func (client *CoCClient) GetClanMembers(clanTag string) ([]ClanMember, error) {
 func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, error) {
 	players := make([]Player, len(clanMembers))
 
-	const maxConcurrency = 10
-	sem := make(chan struct{}, maxConcurrency)
-
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var firstErr error
 
 	for i, member := range clanMembers {
 		wg.Go(func() {
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
 			endpoint := fmt.Sprintf("v1/players/%s", member.Tag)
 			var player Player
 
@@ -78,6 +96,9 @@ func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, err
 	return players, nil
 }
 func (client *CoCClient) doRequest(endpoint string, target any) error {
+	client.sem <- struct{}{}
+	defer func() { <-client.sem }()
+
 	reqURL, err := url.JoinPath("https://api.clashofclans.com", endpoint)
 	if err != nil {
 		return fmt.Errorf("failed to construct request URL: %w", err)
@@ -108,6 +129,21 @@ func (client *CoCClient) doRequest(endpoint string, target any) error {
 	return nil
 }
 
+type LeagueGroupResponse struct {
+	Clans  []ClanCWL `json:"clans"`
+	Rounds []Round   `json:"rounds"`
+}
+type ClanCWL struct {
+	Tag           string       `json:"tag"`
+	Name          string       `json:"name"`
+	ListedMembers []ClanMember `json:"members"`
+}
+type Round struct {
+	WarTags [4]string `json:"warTags"`
+}
+type War struct {
+	TeamSize int `json:"teamSize"`
+}
 type ClanMembersResponse struct {
 	Items []ClanMember `json:"items"`
 }
