@@ -47,6 +47,43 @@ func (client *CoCClient) GetWarInfo(warTag string) (War, error) {
 
 	return war, nil
 }
+func (client *CoCClient) GetScoredClan(clan ClanCWL, teamSize int, mode Mode) (ScoredClan, error) {
+	currentMembers, err := client.GetClanMembers(clan.Tag)
+	if err != nil {
+		return ScoredClan{}, fmt.Errorf("failed to fetch current members for clan %q: %w", clan.Name, err)
+	}
+
+	inClan := make(map[string]bool, len(currentMembers))
+	for _, m := range currentMembers {
+		inClan[m.Tag] = true
+	}
+
+	presentMembers := make([]ClanMember, 0, len(clan.ListedMembers))
+	for _, regMem := range clan.ListedMembers {
+		if inClan[regMem.Tag] {
+			presentMembers = append(presentMembers, regMem)
+		}
+	}
+
+	players, err := client.GetPlayersInfo(presentMembers)
+	if err != nil {
+		return ScoredClan{}, fmt.Errorf("failed to fetch players info for %q: %w", clan.Name, err)
+	}
+
+	sortPlayers(players, ByScore, CWLGroup, false)
+
+	limit := min(teamSize, len(players))
+	clanScore := 0
+	for j := range limit {
+		clanScore += players[j].Score(mode)
+	}
+
+	return ScoredClan{
+		ClanCWL:        clan,
+		Score:          clanScore,
+		PresentMembers: presentMembers,
+	}, nil
+}
 func (client *CoCClient) GetClanMembers(clanTag string) ([]ClanMember, error) {
 	var response ClanMembersResponse
 	endpoint := fmt.Sprintf("v1/clans/%s/members", clanTag)
