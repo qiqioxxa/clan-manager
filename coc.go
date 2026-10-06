@@ -47,7 +47,7 @@ func (client *CoCClient) GetWarInfo(warTag string) (War, error) {
 
 	return war, nil
 }
-func (client *CoCClient) GetScoredClan(clan ClanCWL, teamSize int, mode Mode) (ScoredClan, error) {
+func (client *CoCClient) GetScoredClan(clan ClanCWL, teamSize int) (ScoredClan, error) {
 	currentMembers, err := client.GetClanMembers(clan.Tag)
 	if err != nil {
 		return ScoredClan{}, fmt.Errorf("failed to fetch current members for clan %q: %w", clan.Name, err)
@@ -70,12 +70,12 @@ func (client *CoCClient) GetScoredClan(clan ClanCWL, teamSize int, mode Mode) (S
 		return ScoredClan{}, fmt.Errorf("failed to fetch players info for %q: %w", clan.Name, err)
 	}
 
-	sortPlayers(players, ByScore, CWLGroup, false)
+	sortPlayers(players, ByScore, ReportCWLGroup, false)
 
 	limit := min(teamSize, len(players))
 	clanScore := 0
 	for j := range limit {
-		clanScore += players[j].Score(mode)
+		clanScore += players[j].Score(ReportCWLGroup)
 	}
 
 	return ScoredClan{
@@ -271,13 +271,11 @@ func (p *Player) processAchievements() {
 	p.Achievements = nil
 }
 
-func (p *Player) Score(mode Mode) int {
-	switch mode {
-	case Progression:
+func (p *Player) Score(report ReportType) int {
+	switch report {
+	case ReportRoster:
 		return p.progressionScore()
-	case ClanWar:
-		return p.clanWarScore()
-	case ClanWarLeague, CWLGroup:
+	case ReportCWLGroup:
 		return p.clanWarLeagueScore()
 	default:
 		return 0
@@ -285,52 +283,18 @@ func (p *Player) Score(mode Mode) int {
 }
 func (p *Player) progressionScore() int {
 	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
-	return weightedSum / 8
-}
-func (p *Player) clanWarScore() int {
-	maxLimit, okMax := heroSumLimits[p.TownHall]
-	minLimit, okMin := heroSumLimits[p.TownHall-3]
-
-	if !okMax {
-		maxLimit = p.TownHall * 25
-	}
-	if !okMin {
-		minLimit = 0
-	}
-
-	threeTownhallRange := maxLimit - minLimit
-	if threeTownhallRange == 0 {
-		threeTownhallRange = 1
-	}
-
-	rushCoef := float64(p.HeroSum-minLimit) / float64(threeTownhallRange)
-
-	if rushCoef < 0.0 {
-		rushCoef = 0.0
-	}
-
-	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
-
-	score := (float64(weightedSum) + float64(p.WarStars*5)) * rushCoef / float64(p.TownHall)
-
-	return int(score)
+	maxSum := maxHeroes*10 + maxEquipment*12 + maxLab*3
+	return int(float64(weightedSum) / float64(maxSum) * 1000)
 }
 func (p *Player) clanWarLeagueScore() int {
-	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
-	return (weightedSum/8 + p.TownHall*100 + p.WarLeagueStars) / 5
+	weightedSum := p.progressionScore() + p.TownHall*100 + min(1000, p.WarLeagueStars)
+	maxSum := 1000 + (maxTownhall * 100) + 1000
+	return int(float64(weightedSum) / float64(maxSum) * 1000)
 }
 
-var heroSumLimits = map[int]int{
-	7:  10,
-	8:  30,
-	9:  70,
-	10: 100,
-	11: 150,
-	12: 210,
-	13: 275,
-	14: 320,
-	15: 365,
-	16: 400,
-	17: 435,
-	18: 465,
-}
+const (
+	maxTownhall  = 18
+	maxHeroes    = 480
+	maxEquipment = 324
+	maxLab       = 570
+)

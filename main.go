@@ -20,10 +20,13 @@ func main() {
 
 	client := NewCoCClient(cfg.APIToken)
 
-	if cfg.Mode == CWLGroup {
+	switch cfg.Report {
+	case ReportRoster:
+		err = runRosterReport(client, cfg)
+	case ReportCWLGroup:
 		err = runCWLGroupReport(client, cfg)
-	} else {
-		err = runClanReport(client, cfg)
+	case ReportCWLLayout:
+		err = runCWLLayoutReport(client, cfg)
 	}
 
 	if err != nil {
@@ -38,6 +41,40 @@ type ScoredClan struct {
 	PresentMembers []ClanMember
 }
 
+func runRosterReport(client *CoCClient, cfg Config) error {
+	clanMembers, err := client.GetClanMembers(cfg.ClanTag)
+	if err != nil {
+		return fmt.Errorf("failed to fetch clan data: %v", err)
+	}
+
+	players, err := client.GetPlayersInfo(clanMembers)
+	if err != nil {
+		return fmt.Errorf("failed to fetch players info: %v", err)
+	}
+
+	fmt.Printf("Fetched %d players info\n", len(players))
+
+	sortPlayers(players, cfg.SortBy, cfg.Report, cfg.Reversed)
+
+	formatter := rosterFormatters[cfg.View]
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(formatter.Header)
+
+	totalScore := 0
+	for i, player := range players {
+		t.AppendRow(formatter.GenerateRow(i+1, player))
+		totalScore += player.Score(cfg.Report)
+	}
+	t.Render()
+
+	if cfg.View == ViewProgression && len(players) != 0 {
+		fmt.Printf("Avg clan %s score: %d\n", cfg.View, totalScore/len(players))
+	}
+
+	return nil
+}
 func runCWLGroupReport(client *CoCClient, cfg Config) error {
 	lgr, err := client.GetLeagueGroup(cfg.ClanTag)
 	if err != nil {
@@ -57,7 +94,7 @@ func runCWLGroupReport(client *CoCClient, cfg Config) error {
 
 	for i, clan := range lgr.Clans {
 		wg.Go(func() {
-			scoredClans[i], err = client.GetScoredClan(clan, war.TeamSize, cfg.Mode)
+			scoredClan, err := client.GetScoredClan(clan, war.TeamSize)
 			if err != nil {
 				mu.Lock()
 				if firstErr == nil {
@@ -66,6 +103,7 @@ func runCWLGroupReport(client *CoCClient, cfg Config) error {
 				mu.Unlock()
 				return
 			}
+			scoredClans[i] = scoredClan
 		})
 	}
 
@@ -83,51 +121,20 @@ func runCWLGroupReport(client *CoCClient, cfg Config) error {
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Rank", "Name", "Tag", "Listed", "Present", fmt.Sprintf("Top-%d score", war.TeamSize)})
+	t.AppendHeader(table.Row{"Rank", "Name", "Tag", "Listed", "Present", fmt.Sprintf("Top-%d avg", war.TeamSize)})
 
 	for _, clan := range scoredClans {
-		t.AppendRow(table.Row{clan.Rank, clan.Name, clan.Tag, len(clan.ListedMembers), len(clan.PresentMembers), clan.Score})
+		t.AppendRow(table.Row{clan.Rank, clan.Name, clan.Tag, len(clan.ListedMembers), len(clan.PresentMembers), clan.Score / war.TeamSize})
 	}
 	t.Render()
 
 	return nil
 }
-func runClanReport(client *CoCClient, cfg Config) error {
-	clanMembers, err := client.GetClanMembers(cfg.ClanTag)
-	if err != nil {
-		return fmt.Errorf("failed to fetch clan data: %v", err)
-	}
-
-	players, err := client.GetPlayersInfo(clanMembers)
-	if err != nil {
-		return fmt.Errorf("failed to fetch players info: %v", err)
-	}
-
-	fmt.Printf("Fetched %d players info\n", len(players))
-
-	sortPlayers(players, cfg.SortBy, cfg.Mode, cfg.Reversed)
-
-	formatter := rosterFormatters[cfg.Mode]
-
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(formatter.Header)
-
-	totalScore := 0
-	for i, player := range players {
-		t.AppendRow(formatter.GenerateRow(i+1, player))
-		totalScore += player.Score(cfg.Mode)
-	}
-	t.Render()
-
-	if cfg.Mode == Progression || cfg.Mode == ClanWar || cfg.Mode == ClanWarLeague {
-		fmt.Printf("Total clan %s score: %d, avg = %d\n", cfg.Mode, totalScore, totalScore/len(players))
-	}
-
+func runCWLLayoutReport(client *CoCClient, cfg Config) error {
 	return nil
 }
 
-func sortPlayers(players []Player, sortColumn SortColumn, mode Mode, reversed bool) {
+func sortPlayers(players []Player, sortColumn SortColumn, report ReportType, reversed bool) {
 	slices.SortFunc(players, func(a, b Player) int {
 		var result int
 
@@ -153,7 +160,7 @@ func sortPlayers(players []Player, sortColumn SortColumn, mode Mode, reversed bo
 		case ByWarLeagueStars:
 			result = cmp.Compare(b.WarLeagueStars, a.WarLeagueStars)
 		case ByScore:
-			result = cmp.Compare(b.Score(mode), a.Score(mode))
+			result = cmp.Compare(b.Score(report), a.Score(report))
 		default:
 			result = cmp.Compare(b.TownHall, a.TownHall)
 		}
