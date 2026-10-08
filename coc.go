@@ -25,18 +25,18 @@ func NewCoCClient(token string) *CoCClient {
 	}
 }
 
-func (client *CoCClient) GetLeagueGroup(clanTag string) (LeagueGroupResponse, error) {
-	var response LeagueGroupResponse
+func (client *CoCClient) GetCWLGroup(clanTag string) (CWLGroup, error) {
+	var group CWLGroup
 	endpoint := fmt.Sprintf("v1/clans/%s/currentwar/leaguegroup", clanTag)
 
-	err := client.doRequest(endpoint, &response)
+	err := client.doRequest(endpoint, &group)
 	if err != nil {
-		return LeagueGroupResponse{}, err
+		return CWLGroup{}, err
 	}
 
-	return response, nil
+	return group, nil
 }
-func (client *CoCClient) GetWarInfo(warTag string) (War, error) {
+func (client *CoCClient) GetWar(warTag string) (War, error) {
 	var war War
 	endpoint := fmt.Sprintf("v1/clanwarleagues/wars/%s", warTag)
 
@@ -47,10 +47,10 @@ func (client *CoCClient) GetWarInfo(warTag string) (War, error) {
 
 	return war, nil
 }
-func (client *CoCClient) GetScoredClan(clan ClanCWL, teamSize int) (ScoredClan, error) {
+func (client *CoCClient) GetScoredClan(clan CWLClan, teamSize int) (ScoredCWLClan, error) {
 	currentMembers, err := client.GetClanMembers(clan.Tag)
 	if err != nil {
-		return ScoredClan{}, fmt.Errorf("failed to fetch current members for clan %q: %w", clan.Name, err)
+		return ScoredCWLClan{}, fmt.Errorf("failed to fetch current members of clan %q: %w", clan.Name, err)
 	}
 
 	inClan := make(map[string]bool, len(currentMembers))
@@ -67,7 +67,7 @@ func (client *CoCClient) GetScoredClan(clan ClanCWL, teamSize int) (ScoredClan, 
 
 	players, err := client.GetPlayersInfo(presentMembers)
 	if err != nil {
-		return ScoredClan{}, fmt.Errorf("failed to fetch players info for %q: %w", clan.Name, err)
+		return ScoredCWLClan{}, fmt.Errorf("failed to fetch players info for %q: %w", clan.Name, err)
 	}
 
 	sortPlayers(players, ByScore, ReportCWLGroup, false)
@@ -78,11 +78,66 @@ func (client *CoCClient) GetScoredClan(clan ClanCWL, teamSize int) (ScoredClan, 
 		clanScore += players[j].Score(ReportCWLGroup)
 	}
 
-	return ScoredClan{
-		ClanCWL:        clan,
+	return ScoredCWLClan{
+		CWLClan:        clan,
 		Score:          clanScore,
 		PresentMembers: presentMembers,
 	}, nil
+}
+func (client *CoCClient) GetCWLWarStats(rounds []Round) (map[string]WarStats, error) {
+	var warTags []string
+	for _, round := range rounds {
+		for _, warTag := range round.WarTags {
+			if warTag != "#0" {
+				warTags = append(warTags, warTag)
+			}
+		}
+	}
+
+	wars := make([]War, len(warTags))
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
+
+	for i, warTag := range warTags {
+		wg.Go(func() {
+			war, err := client.GetWar(warTag)
+			if err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				mu.Unlock()
+				return
+			}
+			wars[i] = war
+		})
+	}
+
+	wg.Wait()
+
+	if firstErr != nil {
+		return map[string]WarStats{}, firstErr
+	}
+
+	warStats := make(map[string]WarStats)
+
+	for _, war := range wars {
+		clanStats := warStats[war.Clan.Tag]
+		clanStats.TeamSize = war.TeamSize
+		clanStats.Attacks += war.Clan.Attacks
+		clanStats.Stars += war.Clan.Stars
+		warStats[war.Clan.Tag] = clanStats
+
+		oppStats := warStats[war.Opponent.Tag]
+		oppStats.TeamSize = war.TeamSize
+		oppStats.Attacks += war.Opponent.Attacks
+		oppStats.Stars += war.Opponent.Stars
+		warStats[war.Opponent.Tag] = oppStats
+	}
+
+	return warStats, nil
 }
 func (client *CoCClient) GetClanMembers(clanTag string) ([]ClanMember, error) {
 	var response ClanMembersResponse
@@ -166,20 +221,48 @@ func (client *CoCClient) doRequest(endpoint string, target any) error {
 	return nil
 }
 
-type LeagueGroupResponse struct {
-	Clans  []ClanCWL `json:"clans"`
+type CWLGroup struct {
+	Clans  []CWLClan `json:"clans"`
 	Rounds []Round   `json:"rounds"`
 }
-type ClanCWL struct {
-	Tag           string       `json:"tag"`
-	Name          string       `json:"name"`
+type Clan struct {
+	Tag  string `json:"tag"`
+	Name string `json:"name"`
+}
+type CWLClan struct {
+	Clan
 	ListedMembers []ClanMember `json:"members"`
 }
 type Round struct {
 	WarTags [4]string `json:"warTags"`
 }
 type War struct {
-	TeamSize int `json:"teamSize"`
+	TeamSize int     `json:"teamSize"`
+	Clan     WarClan `json:"clan"`
+	Opponent WarClan `json:"opponent"`
+}
+type WarClan struct {
+	Clan
+	Attacks int         `json:"attacks"`
+	Stars   int         `json:"stars"`
+	Members []WarMember `json:"members"`
+}
+type WarMember struct {
+	Tag      string `json:"tag"`
+	TownHall int    `json:"townHallLevel"`
+}
+type ScoredCWLClan struct {
+	CWLClan
+	Rank           int
+	Score          int
+	Attacks        int
+	Stars          int
+	PresentMembers []ClanMember
+}
+type WarStats struct {
+	TeamSize int
+	Stars    int
+	Attacks  int
 }
 type ClanMembersResponse struct {
 	Items []ClanMember `json:"items"`

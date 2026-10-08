@@ -88,13 +88,20 @@ func (c *Config) Validate() error {
 
 	case ReportCWLGroup:
 		viewExplicitlySet := false
+		sortExplicitlySet := false
 		flag.Visit(func(f *flag.Flag) {
 			if f.Name == "view" {
 				viewExplicitlySet = true
 			}
+			if f.Name == "sort" {
+				sortExplicitlySet = true
+			}
 		})
 		if viewExplicitlySet {
 			return fmt.Errorf("flag -view cannot be set for cwlgroup")
+		}
+		if !sortExplicitlySet {
+			c.SortBy = ByStars
 		}
 
 		allowedSort := map[SortColumn]bool{
@@ -102,9 +109,11 @@ func (c *Config) Validate() error {
 			ByListed:  true,
 			ByPresent: true,
 			ByScore:   true,
+			ByStars:   true,
+			ByAttacks: true,
 		}
 		if !allowedSort[c.SortBy] {
-			return fmt.Errorf("invalid -sort %q for -report %q (allowed: name, listed, present, score)", c.SortBy, ReportCWLGroup)
+			return fmt.Errorf("invalid -sort %q for -report %q (allowed: name, listed, present, score, stars, attacks)", c.SortBy, ReportCWLGroup)
 		}
 
 	case ReportCWLLayout:
@@ -171,19 +180,38 @@ const (
 	ByScore                SortColumn = "score"
 	ByListed               SortColumn = "listed"
 	ByPresent              SortColumn = "present"
+	ByStars                SortColumn = "stars"
+	ByAttacks              SortColumn = "attacks"
 )
+
+var validSortColumns = map[SortColumn]bool{
+	ByName:                 true,
+	ByTownHall:             true,
+	ByHeroSum:              true,
+	ByEquipmentSum:         true,
+	ByLabUpdates:           true,
+	ByWarStars:             true,
+	ByWarLeagueStars:       true,
+	ByDonations:            true,
+	ByClanGamesPoints:      true,
+	ByCapitalContributions: true,
+	ByScore:                true,
+	ByListed:               true,
+	ByPresent:              true,
+	ByStars:                true,
+	ByAttacks:              true,
+}
 
 func (s *SortColumn) String() string {
 	return string(*s)
 }
 func (s *SortColumn) Set(val string) error {
-	switch SortColumn(strings.ToLower(val)) {
-	case ByName, ByTownHall, ByHeroSum, ByEquipmentSum, ByLabUpdates, ByWarStars, ByWarLeagueStars, ByDonations, ByClanGamesPoints, ByCapitalContributions, ByScore, ByListed, ByPresent:
-		*s = SortColumn(strings.ToLower(val))
-		return nil
-	default:
-		return fmt.Errorf("invalid sort column %q (allowed: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score, listed, present)", val)
+	v := SortColumn(strings.ToLower(val))
+	if !validSortColumns[v] {
+		return fmt.Errorf("invalid sort column %q (allowed: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score, listed, present, stars, attacks)", val)
 	}
+	*s = v
+	return nil
 }
 
 type RosterFormatter struct {
@@ -193,21 +221,79 @@ type RosterFormatter struct {
 
 var rosterFormatters = map[RosterView]RosterFormatter{
 	ViewAll: {
-		Header: table.Row{"ID", "Name", "Townhall", "Hero sum", "Equip sum", "Lab updates", "CW stars", "CWL stars", "Donations", "Clan Games points", "Capital contributions"},
+		Header: table.Row{
+			"ID",
+			"Name",
+			"Townhall",
+			"Hero sum",
+			"Equip sum",
+			"Lab updates",
+			"CW stars",
+			"CWL stars",
+			"Donations",
+			"Clan Games points",
+			"Capital contributions",
+		},
 		GenerateRow: func(id int, p Player) table.Row {
-			return table.Row{id, p.Name, p.TownHall, p.HeroSum, p.EquipmentSum, p.LabUpdates, p.WarStars, p.WarLeagueStars, p.Donations, p.ClanGamesPoints, p.ClanCapitalContributions}
+			return table.Row{
+				id,
+				p.Name,
+				p.TownHall,
+				p.HeroSum,
+				p.EquipmentSum,
+				p.LabUpdates,
+				p.WarStars,
+				p.WarLeagueStars,
+				p.Donations,
+				p.ClanGamesPoints,
+				p.ClanCapitalContributions,
+			}
 		},
 	},
 	ViewProgression: {
-		Header: table.Row{"ID", "Name", "Townhall", "Hero sum", "Equip sum", "Lab updates", "Progress score"},
+		Header: table.Row{
+			"ID",
+			"Name",
+			"Townhall",
+			"Hero sum",
+			"Equip sum",
+			"Lab updates",
+			"Progress score",
+		},
 		GenerateRow: func(id int, p Player) table.Row {
-			return table.Row{id, p.Name, p.TownHall, p.HeroSum, p.EquipmentSum, p.LabUpdates, p.Score(ReportRoster)}
+			return table.Row{
+				id,
+				p.Name,
+				p.TownHall,
+				p.HeroSum,
+				p.EquipmentSum,
+				p.LabUpdates,
+				p.Score(ReportRoster),
+			}
 		},
 	},
 	ViewActivity: {
-		Header: table.Row{"ID", "Name", "Townhall", "CW+CWL stars", "CWL stars", "Donations", "Clan Games points", "Capital contributions"},
+		Header: table.Row{
+			"ID",
+			"Name",
+			"Townhall",
+			"CW stars",
+			"CWL stars",
+			"Donations",
+			"Clan Games points",
+			"Capital contributions",
+		},
 		GenerateRow: func(id int, p Player) table.Row {
-			return table.Row{id, p.Name, p.TownHall, p.WarStars, p.WarLeagueStars, p.Donations, p.ClanGamesPoints, p.ClanCapitalContributions}
+			return table.Row{
+				id,
+				p.Name,
+				p.TownHall,
+				p.WarStars,
+				p.WarLeagueStars,
+				p.Donations,
+				p.ClanGamesPoints,
+				p.ClanCapitalContributions,
+			}
 		},
 	},
 }
