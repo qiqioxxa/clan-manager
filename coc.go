@@ -80,7 +80,7 @@ func (client *CoCClient) GetScoredClan(clan CWLClan, teamSize int) (ScoredCWLCla
 
 	return ScoredCWLClan{
 		CWLClan:        clan,
-		Score:          clanScore,
+		Score:          clanScore / limit,
 		PresentMembers: presentMembers,
 	}, nil
 }
@@ -128,12 +128,18 @@ func (client *CoCClient) GetCWLWarStats(rounds []Round) (map[string]WarStats, er
 		clanStats.TeamSize = war.TeamSize
 		clanStats.Attacks += war.Clan.Attacks
 		clanStats.Stars += war.Clan.Stars
+		if war.Clan.Stars > war.Opponent.Stars {
+			clanStats.WinStars += 10
+		}
 		warStats[war.Clan.Tag] = clanStats
 
 		oppStats := warStats[war.Opponent.Tag]
 		oppStats.TeamSize = war.TeamSize
 		oppStats.Attacks += war.Opponent.Attacks
 		oppStats.Stars += war.Opponent.Stars
+		if war.Opponent.Stars > war.Clan.Stars {
+			oppStats.WinStars += 10
+		}
 		warStats[war.Opponent.Tag] = oppStats
 	}
 
@@ -255,14 +261,16 @@ type ScoredCWLClan struct {
 	CWLClan
 	Rank           int
 	Score          int
-	Attacks        int
 	Stars          int
+	Attacks        int
+	WinStars       int
 	PresentMembers []ClanMember
 }
 type WarStats struct {
 	TeamSize int
 	Stars    int
 	Attacks  int
+	WinStars int
 }
 type ClanMembersResponse struct {
 	Items []ClanMember `json:"items"`

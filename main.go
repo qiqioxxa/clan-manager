@@ -113,6 +113,7 @@ func runCWLGroupReport(client *CoCClient, cfg Config) error {
 		if ok {
 			scoredClans[i].Stars = warStats.Stars
 			scoredClans[i].Attacks = warStats.Attacks
+			scoredClans[i].WinStars = warStats.WinStars
 		}
 	}
 
@@ -140,10 +141,10 @@ func runCWLGroupReport(client *CoCClient, cfg Config) error {
 		t.AppendRow(table.Row{
 			clan.Rank,
 			clan.Name,
-			clan.Stars,
+			clan.Stars + clan.WinStars,
 			clan.Attacks,
 			fmt.Sprintf("%.2f", avgStars),
-			clan.Score / teamSize,
+			clan.Score,
 			len(clan.ListedMembers),
 			len(clan.PresentMembers),
 			clan.Tag,
@@ -170,7 +171,7 @@ func runCWLLayoutReport(client *CoCClient, cfg Config) error {
 		for j, warTag := range round.WarTags {
 			war, err := client.GetWar(warTag)
 			if err != nil {
-				return fmt.Errorf("failed to fetch war №%d of day %d", j, i)
+				return fmt.Errorf("failed to fetch war №%d of day %d", j+1, i+1)
 			}
 
 			if war.Clan.Tag == cfg.ClanTag {
@@ -241,8 +242,13 @@ func runCWLLayoutReport(client *CoCClient, cfg Config) error {
 
 		t.SetRowPainter(func(row table.Row) text.Colors {
 			clanName, ok := row[0].(string)
-			if ok && tagByName[clanName] == enemyTag {
-				return text.Colors{text.BgRed, text.Bold}
+			if ok {
+				if tagByName[clanName] == enemyTag {
+					return text.Colors{text.BgRed, text.Bold}
+				}
+				if tagByName[clanName] == cfg.ClanTag {
+					return text.Colors{text.BgGreen, text.Bold}
+				}
 			}
 			return nil
 		})
@@ -266,7 +272,11 @@ func sortPlayers(players []Player, sortColumn SortColumn, report ReportType, rev
 		case ByName:
 			result = cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 		case ByTownHall:
-			result = cmp.Compare(b.TownHall, a.TownHall)
+			if a.TownHall != b.TownHall {
+				result = cmp.Compare(b.TownHall, a.TownHall)
+			} else {
+				result = cmp.Compare(b.Score(ReportRoster), a.Score(ReportRoster))
+			}
 		case ByWarStars:
 			result = cmp.Compare(b.WarStars, a.WarStars)
 		case ByCapitalContributions:
