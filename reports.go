@@ -3,46 +3,24 @@ package main
 import (
 	"cmp"
 	"fmt"
-	"os"
 	"slices"
 	"sync"
-
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
 )
 
 func runRosterReport(client *CoCClient, cfg Config) error {
 	clanMembers, err := client.GetClanMembers(cfg.ClanTag)
 	if err != nil {
-		return fmt.Errorf("failed to fetch clan data: %v", err)
+		return fmt.Errorf("failed to fetch clan data: %w", err)
 	}
 
 	players, err := client.GetPlayersInfo(clanMembers)
 	if err != nil {
-		return fmt.Errorf("failed to fetch players info: %v", err)
+		return fmt.Errorf("failed to fetch players info: %w", err)
 	}
-
-	fmt.Printf("Fetched %d players info\n", len(players))
 
 	sortPlayers(players, cfg.SortBy, cfg.Report, cfg.Reversed)
 
-	formatter := rosterFormatters[cfg.View]
-
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(formatter.Header)
-
-	totalScore := 0
-	for i, player := range players {
-		t.AppendRow(formatter.GenerateRow(i+1, player))
-		totalScore += player.Score(cfg.Report)
-	}
-	t.Render()
-
-	if cfg.View == ViewProgression && len(players) != 0 {
-		fmt.Printf("Avg clan %s score: %d\n", cfg.View, totalScore/len(players))
-	}
-
+	renderRoster(players, cfg.View)
 	return nil
 }
 func runCWLGroupReport(client *CoCClient, cfg Config) error {
@@ -85,11 +63,11 @@ func runCWLGroupReport(client *CoCClient, cfg Config) error {
 	}
 
 	for i := range scoredClans {
-		warStats, ok := warStats[scoredClans[i].Tag]
+		stats, ok := warStats[scoredClans[i].Tag]
 		if ok {
-			scoredClans[i].Stars = warStats.Stars
-			scoredClans[i].Attacks = warStats.Attacks
-			scoredClans[i].WinStars = warStats.WinStars
+			scoredClans[i].Stars = stats.Stars
+			scoredClans[i].Attacks = stats.Attacks
+			scoredClans[i].WinStars = stats.WinStars
 		}
 	}
 
@@ -99,35 +77,7 @@ func runCWLGroupReport(client *CoCClient, cfg Config) error {
 	}
 	sortClans(scoredClans, cfg.SortBy, cfg.Reversed)
 
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Rank", "Name", "Stars", "Attacks", "Stars/atk", "Score", "Listed", "Present", "Tag"})
-	t.SetColumnConfigs([]table.ColumnConfig{
-		{
-			Name:  "Stars/atk",
-			Align: text.AlignRight,
-		},
-	})
-
-	for _, clan := range scoredClans {
-		avgStars := 0.0
-		if clan.Attacks > 0 {
-			avgStars = float64(clan.Stars) / float64(clan.Attacks)
-		}
-		t.AppendRow(table.Row{
-			clan.Rank,
-			clan.Name,
-			clan.Stars + clan.WinStars,
-			clan.Attacks,
-			fmt.Sprintf("%.2f", avgStars),
-			clan.Score,
-			len(clan.ListedMembers),
-			len(clan.PresentMembers),
-			clan.Tag,
-		})
-	}
-	t.Render()
-
+	renderCWLGroup(scoredClans)
 	return nil
 }
 func runCWLLayoutReport(client *CoCClient, cfg Config) error {
@@ -198,41 +148,7 @@ func runCWLLayoutReport(client *CoCClient, cfg Config) error {
 			return cmp.Compare(a.Name, b.Name)
 		})
 
-		fmt.Printf("=== DAY %d ===\n", i+1)
-
-		t := table.NewWriter()
-		t.SetOutputMirror(os.Stdout)
-		t.AppendHeader(table.Row{"Clan", "<11", "11", "12", "13", "14", "15", "16", "17", "18", "Sum"})
-
-		for _, clan := range clans {
-			row := make(table.Row, 0, len(clan.THs)+2)
-			row = append(row, clan.Name)
-			for _, count := range clan.THs {
-				row = append(row, count)
-			}
-			row = append(row, clan.THSum)
-
-			t.AppendRow(row)
-		}
-
-		tagByName := make(map[string]string, len(clans))
-		for _, clan := range clans {
-			tagByName[clan.Name] = clan.Tag
-		}
-
-		t.SetRowPainter(func(row table.Row) text.Colors {
-			clanName, ok := row[0].(string)
-			if ok {
-				if tagByName[clanName] == enemyTag {
-					return text.Colors{text.BgRed, text.Bold}
-				}
-				if tagByName[clanName] == cfg.ClanTag {
-					return text.Colors{text.BgGreen, text.Bold}
-				}
-			}
-			return nil
-		})
-		t.Render()
+		renderCWLLayout(clans, i+1, cfg.ClanTag, enemyTag)
 	}
 
 	return nil
