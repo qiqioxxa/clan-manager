@@ -8,13 +8,12 @@ import (
 )
 
 type Config struct {
-	APIToken   string
-	ClanTag    string
-	Report     ReportType
-	View       RosterView
-	SortBy     SortColumn
-	Reversed   bool
-	OutputFile string
+	APIToken string
+	ClanTag  string
+	Report   ReportType
+	View     RosterView
+	SortBy   SortColumn
+	Reversed bool
 }
 
 func parseFlags() (Config, error) {
@@ -30,7 +29,6 @@ func parseFlags() (Config, error) {
 	flag.Var(&cfg.View, "view", "Roster view (for -report roster): all, progression, activity")
 	flag.Var(&cfg.SortBy, "sort", "Sort column")
 	flag.BoolVar(&cfg.Reversed, "r", false, "Reverse sorting order")
-	flag.StringVar(&cfg.OutputFile, "out", "clan_stats.xlsx", "Output Excel file")
 
 	flag.Parse()
 
