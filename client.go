@@ -73,6 +73,14 @@ func (client *CoCClient) GetScoredClan(clan CWLClan, teamSize int) (ScoredCWLCla
 	sortPlayers(players, ByScore, ReportCWLGroup, false)
 
 	limit := min(teamSize, len(players))
+	if limit <= 0 {
+		return ScoredCWLClan{
+			CWLClan:        clan,
+			Score:          0,
+			PresentMembers: presentMembers,
+		}, nil
+	}
+
 	clanScore := 0
 	for j := range limit {
 		clanScore += players[j].Score(ReportCWLGroup)
@@ -226,166 +234,3 @@ func (client *CoCClient) doRequest(endpoint string, target any) error {
 
 	return nil
 }
-
-type CWLGroup struct {
-	Clans  []CWLClan `json:"clans"`
-	Rounds []Round   `json:"rounds"`
-}
-type Clan struct {
-	Tag  string `json:"tag"`
-	Name string `json:"name"`
-}
-type CWLClan struct {
-	Clan
-	ListedMembers []ClanMember `json:"members"`
-}
-type Round struct {
-	WarTags [4]string `json:"warTags"`
-}
-type War struct {
-	TeamSize int     `json:"teamSize"`
-	Clan     WarClan `json:"clan"`
-	Opponent WarClan `json:"opponent"`
-}
-type WarClan struct {
-	Clan
-	Attacks int         `json:"attacks"`
-	Stars   int         `json:"stars"`
-	Members []WarMember `json:"members"`
-}
-type WarMember struct {
-	Tag      string `json:"tag"`
-	TownHall int    `json:"townHallLevel"`
-}
-type ScoredCWLClan struct {
-	CWLClan
-	Rank           int
-	Score          int
-	Stars          int
-	Attacks        int
-	WinStars       int
-	PresentMembers []ClanMember
-}
-type WarStats struct {
-	TeamSize int
-	Stars    int
-	Attacks  int
-	WinStars int
-}
-type ClanMembersResponse struct {
-	Items []ClanMember `json:"items"`
-}
-type ClanMember struct {
-	Tag string `json:"tag"`
-}
-type Player struct {
-	Tag                      string        `json:"tag"`
-	Name                     string        `json:"name"`
-	TownHall                 int           `json:"townHallLevel"`
-	WarStars                 int           `json:"warStars"`
-	ClanCapitalContributions int           `json:"clanCapitalContributions"`
-	Achievements             []Achievement `json:"achievements"`
-	Heroes                   []Hero        `json:"heroes"`
-	Troops                   []Troop       `json:"troops"`
-	Spells                   []Spell       `json:"spells"`
-
-	HeroSum         int `json:"-"`
-	EquipmentSum    int `json:"-"`
-	LabUpdates      int `json:"-"`
-	Donations       int `json:"-"`
-	ClanGamesPoints int `json:"-"`
-	WarLeagueStars  int `json:"-"`
-}
-type Achievement struct {
-	Name  string `json:"name"`
-	Value int    `json:"value"`
-}
-type Hero struct {
-	Name      string      `json:"name"`
-	Level     int         `json:"level"`
-	Village   string      `json:"village"`
-	Equipment []Equipment `json:"equipment"`
-}
-type Equipment struct {
-	Name    string `json:"name"`
-	Level   int    `json:"level"`
-	Village string `json:"village"`
-}
-type Troop struct {
-	Name    string `json:"name"`
-	Level   int    `json:"level"`
-	Village string `json:"village"`
-}
-type Spell struct {
-	Name    string `json:"name"`
-	Level   int    `json:"level"`
-	Village string `json:"village"`
-}
-
-func (p *Player) calculateSums() {
-	p.HeroSum = 0
-	p.EquipmentSum = 0
-	p.LabUpdates = 0
-
-	for _, hero := range p.Heroes {
-		if hero.Village == "home" {
-			p.HeroSum += hero.Level
-			for _, equipment := range hero.Equipment {
-				p.EquipmentSum += equipment.Level
-			}
-		}
-	}
-
-	for _, troop := range p.Troops {
-		if troop.Village == "home" {
-			p.LabUpdates += troop.Level - 1
-		}
-	}
-
-	for _, spell := range p.Spells {
-		if spell.Village == "home" {
-			p.LabUpdates += spell.Level - 1
-		}
-	}
-}
-func (p *Player) processAchievements() {
-	for _, a := range p.Achievements {
-		switch a.Name {
-		case "Friend in Need":
-			p.Donations = a.Value
-		case "Games Champion":
-			p.ClanGamesPoints = a.Value
-		case "War League Legend":
-			p.WarLeagueStars = a.Value
-		}
-	}
-	p.Achievements = nil
-}
-
-func (p *Player) Score(report ReportType) int {
-	switch report {
-	case ReportRoster:
-		return p.progressionScore()
-	case ReportCWLGroup:
-		return p.clanWarLeagueScore()
-	default:
-		return 0
-	}
-}
-func (p *Player) progressionScore() int {
-	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
-	maxSum := maxHeroes*10 + maxEquipment*12 + maxLab*3
-	return int(float64(weightedSum) / float64(maxSum) * 1000)
-}
-func (p *Player) clanWarLeagueScore() int {
-	weightedSum := p.progressionScore() + p.TownHall*100 + min(1000, p.WarLeagueStars)
-	maxSum := 1000 + (maxTownhall * 100) + 1000
-	return int(float64(weightedSum) / float64(maxSum) * 1000)
-}
-
-const (
-	maxTownhall  = 18
-	maxHeroes    = 480
-	maxEquipment = 324
-	maxLab       = 570
-)
