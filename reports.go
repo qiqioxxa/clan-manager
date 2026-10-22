@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-func runRosterReport(client *CoCClient, cfg Config) error {
+func runRosterReport(client *CoCClient, cfg RosterConfig) error {
 	clanMembers, err := client.GetClanMembers(cfg.ClanTag)
 	if err != nil {
 		return fmt.Errorf("failed to fetch clan data: %w", err)
@@ -18,12 +18,12 @@ func runRosterReport(client *CoCClient, cfg Config) error {
 		return fmt.Errorf("failed to fetch players info: %w", err)
 	}
 
-	sortPlayers(players, cfg.SortBy, cfg.Report, cfg.Reversed)
+	sortPlayers(players, cfg.SortBy, false, cfg.Reversed)
 
 	renderRoster(players, cfg.View)
 	return nil
 }
-func runCWLGroupReport(client *CoCClient, cfg Config) error {
+func runCWLGroupReport(client *CoCClient, cfg CWLGroupConfig) error {
 	group, err := client.GetCWLGroup(cfg.ClanTag)
 	if err != nil {
 		return fmt.Errorf("failed to fetch CWL group: %w", err)
@@ -80,7 +80,7 @@ func runCWLGroupReport(client *CoCClient, cfg Config) error {
 	renderCWLGroup(scoredClans)
 	return nil
 }
-func runCWLLayoutReport(client *CoCClient, cfg Config) error {
+func runCWLLayoutReport(client *CoCClient, cfg CWLLayoutConfig) error {
 	group, err := client.GetCWLGroup(cfg.ClanTag)
 	if err != nil {
 		return fmt.Errorf("failed to fetch CWL group: %w", err)

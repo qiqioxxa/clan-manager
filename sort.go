@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func sortPlayers(players []Player, sortColumn SortColumn, report ReportType, reversed bool) {
+func sortPlayers(players []Player, sortColumn SortColumn, forCWL bool, reversed bool) {
 	slices.SortFunc(players, func(a, b Player) int {
 		var result int
 
@@ -17,7 +17,7 @@ func sortPlayers(players []Player, sortColumn SortColumn, report ReportType, rev
 			if a.TownHall != b.TownHall {
 				result = cmp.Compare(b.TownHall, a.TownHall)
 			} else {
-				result = cmp.Compare(b.Score(ReportRoster), a.Score(ReportRoster))
+				result = cmp.Compare(b.Score(false), a.Score(false))
 			}
 		case ByWarStars:
 			result = cmp.Compare(b.WarStars, a.WarStars)
@@ -36,7 +36,7 @@ func sortPlayers(players []Player, sortColumn SortColumn, report ReportType, rev
 		case ByWarLeagueStars:
 			result = cmp.Compare(b.WarLeagueStars, a.WarLeagueStars)
 		case ByScore:
-			result = cmp.Compare(b.Score(report), a.Score(report))
+			result = cmp.Compare(b.Score(forCWL), a.Score(forCWL))
 		default:
 			result = cmp.Compare(b.TownHall, a.TownHall)
 		}

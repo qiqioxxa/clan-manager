@@ -62,7 +62,7 @@ var rosterFormatters = map[RosterView]RosterFormatter{
 				p.HeroSum,
 				p.EquipmentSum,
 				p.LabUpdates,
-				p.Score(ReportRoster),
+				p.Score(false),
 			}
 		},
 	},
@@ -102,7 +102,7 @@ func renderRoster(players []Player, view RosterView) {
 	totalScore := 0
 	for i, player := range players {
 		t.AppendRow(formatter.GenerateRow(i+1, player))
-		totalScore += player.Score(ReportRoster)
+		totalScore += player.Score(false)
 	}
 
 	t.Render()

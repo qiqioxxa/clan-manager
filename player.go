@@ -47,14 +47,11 @@ func (p *Player) processAchievements() {
 	p.Achievements = nil
 }
 
-func (p Player) Score(report ReportType) int {
-	switch report {
-	case ReportRoster:
-		return p.progressionScore()
-	case ReportCWLGroup:
+func (p Player) Score(forCWL bool) int {
+	if forCWL {
 		return p.clanWarLeagueScore()
-	default:
-		return 0
+	} else {
+		return p.progressionScore()
 	}
 }
 func (p Player) progressionScore() int {

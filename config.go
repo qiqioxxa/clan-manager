@@ -1,141 +1,90 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 )
 
-type Config struct {
+type GlobalConfig struct {
 	APIToken string
 	ClanTag  string
-	Report   ReportType
+}
+
+type RosterConfig struct {
+	GlobalConfig
 	View     RosterView
+	SortBy   SortColumn
+	Reversed bool
+	Snapshot bool
+	Diff     string
+}
+
+type CWLGroupConfig struct {
+	GlobalConfig
 	SortBy   SortColumn
 	Reversed bool
 }
 
-func parseFlags() (Config, error) {
-	var cfg Config
-
-	cfg.Report = ReportRoster
-	cfg.View = ViewAll
-	cfg.SortBy = ByScore
-
-	flag.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
-	flag.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
-	flag.Var(&cfg.Report, "report", "Report type: roster, cwlgroup, cwllayout")
-	flag.Var(&cfg.View, "view", "Roster view (for -report roster): all, progression, activity")
-	flag.Var(&cfg.SortBy, "sort", "Sort column")
-	flag.BoolVar(&cfg.Reversed, "r", false, "Reverse sorting order")
-
-	flag.Parse()
-
-	err := cfg.Validate()
-	if err != nil {
-		return Config{}, err
-	}
-
-	return cfg, nil
+type CWLLayoutConfig struct {
+	GlobalConfig
 }
 
-func (c *Config) Validate() error {
-	if c.APIToken == "" || c.ClanTag == "" {
-		return errors.New("-token and -tag flags are required")
+func parseFlags() (any, error) {
+	if len(os.Args) < 2 {
+		return nil, fmt.Errorf("expected subcommand: roster, cwlgroup, cwllayout")
 	}
 
-	switch c.Report {
-	case ReportRoster:
-		hasScore := c.View == ViewProgression
-		if c.SortBy == ByScore && !hasScore {
-			sortExplicitlySet := false
-			flag.Visit(func(f *flag.Flag) {
-				if f.Name == "sort" {
-					sortExplicitlySet = true
-				}
-			})
-			if !sortExplicitlySet {
-				c.SortBy = ByTownHall
-			}
+	subcommand := os.Args[1]
+	subArgs := os.Args[2:]
+
+	switch subcommand {
+	case "roster":
+		var cfg RosterConfig
+		set := flag.NewFlagSet("roster", flag.ExitOnError)
+
+		set.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
+		set.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
+		set.Var(&cfg.View, "view", "Roster view: all, progression, activity")
+		set.Var(&cfg.SortBy, "sort", "Sort column")
+		set.BoolVar(&cfg.Reversed, "r", false, "Reverse sorting order")
+		set.BoolVar(&cfg.Snapshot, "snapshot", false, "Make a snapshot of current roster")
+		set.StringVar(&cfg.Diff, "diff", "", "Compare current roster with snapshot")
+
+		if err := set.Parse(subArgs); err != nil {
+			return nil, err
 		}
+		return cfg, nil
 
-		allowedSort := map[SortColumn]bool{
-			ByName:                 true,
-			ByTownHall:             true,
-			ByHeroSum:              true,
-			ByEquipmentSum:         true,
-			ByLabUpdates:           true,
-			ByWarStars:             true,
-			ByWarLeagueStars:       true,
-			ByDonations:            true,
-			ByClanGamesPoints:      true,
-			ByCapitalContributions: true,
-			ByScore:                hasScore,
+	case "cwlgroup":
+		var cfg CWLGroupConfig
+		set := flag.NewFlagSet("cwlgroup", flag.ExitOnError)
+
+		set.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
+		set.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
+		set.Var(&cfg.SortBy, "sort", "Sort column")
+		set.BoolVar(&cfg.Reversed, "r", false, "Reverse sorting order")
+
+		if err := set.Parse(subArgs); err != nil {
+			return nil, err
 		}
+		return cfg, nil
 
-		if !allowedSort[c.SortBy] {
-			allowed := "name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital"
-			if hasScore {
-				allowed += ", score"
-			}
-			return fmt.Errorf("invalid -sort %q for -view %q (allowed: %s)", c.SortBy, c.View, allowed)
+	case "cwllayout":
+		var cfg CWLLayoutConfig
+		set := flag.NewFlagSet("cwllayout", flag.ExitOnError)
+
+		set.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
+		set.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
+
+		if err := set.Parse(subArgs); err != nil {
+			return nil, err
 		}
+		return cfg, nil
 
-	case ReportCWLGroup:
-		viewExplicitlySet := false
-		sortExplicitlySet := false
-		flag.Visit(func(f *flag.Flag) {
-			if f.Name == "view" {
-				viewExplicitlySet = true
-			}
-			if f.Name == "sort" {
-				sortExplicitlySet = true
-			}
-		})
-		if viewExplicitlySet {
-			return fmt.Errorf("flag -view cannot be set for cwlgroup")
-		}
-		if !sortExplicitlySet {
-			c.SortBy = ByStars
-		}
-
-		allowedSort := map[SortColumn]bool{
-			ByName:    true,
-			ByListed:  true,
-			ByPresent: true,
-			ByScore:   true,
-			ByStars:   true,
-			ByAttacks: true,
-		}
-		if !allowedSort[c.SortBy] {
-			return fmt.Errorf("invalid -sort %q for -report %q (allowed: name, listed, present, score, stars, attacks)", c.SortBy, ReportCWLGroup)
-		}
-
-	case ReportCWLLayout:
-	}
-
-	return nil
-}
-
-type ReportType string
-
-const (
-	ReportRoster    ReportType = "roster"
-	ReportCWLGroup  ReportType = "cwlgroup"
-	ReportCWLLayout ReportType = "cwllayout"
-)
-
-func (rt *ReportType) String() string {
-	return string(*rt)
-}
-func (rt *ReportType) Set(val string) error {
-	switch ReportType(strings.ToLower(val)) {
-	case ReportRoster, ReportCWLGroup, ReportCWLLayout:
-		*rt = ReportType(strings.ToLower(val))
-		return nil
 	default:
-		return fmt.Errorf("invalid report type %q (allowed: roster, cwlgroup, cwllayout)", val)
+		return nil, fmt.Errorf("unknown subcommand: %s", subcommand)
 	}
 }
 
