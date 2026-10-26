@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	parsedCfg, err := parseFlags()
+	parsedCfg, err := ParseFlags()
 	if err != nil {
 		log.Fatalf("Configuration error: %v", err)
 	}
@@ -14,13 +14,13 @@ func main() {
 	switch cfg := parsedCfg.(type) {
 	case RosterConfig:
 		client := NewCoCClient(cfg.APIToken)
-		err = runRosterReport(client, cfg)
+		err = RunRosterReport(client, cfg)
 	case CWLGroupConfig:
 		client := NewCoCClient(cfg.APIToken)
-		err = runCWLGroupReport(client, cfg)
+		err = RunCWLGroupReport(client, cfg)
 	case CWLLayoutConfig:
 		client := NewCoCClient(cfg.APIToken)
-		err = runCWLLayoutReport(client, cfg)
+		err = RunCWLLayoutReport(client, cfg)
 	default:
 		err = fmt.Errorf("Unknown configuration type")
 	}

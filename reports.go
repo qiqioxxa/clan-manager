@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-func runRosterReport(client *CoCClient, cfg RosterConfig) error {
+func RunRosterReport(client *CoCClient, cfg RosterConfig) error {
 	clanMembers, err := client.GetClanMembers(cfg.ClanTag)
 	if err != nil {
 		return fmt.Errorf("failed to fetch clan data: %w", err)
@@ -18,12 +18,12 @@ func runRosterReport(client *CoCClient, cfg RosterConfig) error {
 		return fmt.Errorf("failed to fetch players info: %w", err)
 	}
 
-	sortPlayers(players, cfg.SortBy, false, cfg.Reversed)
+	SortPlayers(players, cfg.SortBy, false, cfg.Reversed)
 
-	renderRoster(players, cfg.View)
+	RenderRoster(players, cfg.View)
 	return nil
 }
-func runCWLGroupReport(client *CoCClient, cfg CWLGroupConfig) error {
+func RunCWLGroupReport(client *CoCClient, cfg CWLGroupConfig) error {
 	group, err := client.GetCWLGroup(cfg.ClanTag)
 	if err != nil {
 		return fmt.Errorf("failed to fetch CWL group: %w", err)
@@ -71,16 +71,16 @@ func runCWLGroupReport(client *CoCClient, cfg CWLGroupConfig) error {
 		}
 	}
 
-	sortClans(scoredClans, ByStars, false)
+	SortClans(scoredClans, ByStars, false)
 	for i := range scoredClans {
 		scoredClans[i].Rank = i + 1
 	}
-	sortClans(scoredClans, cfg.SortBy, cfg.Reversed)
+	SortClans(scoredClans, cfg.SortBy, cfg.Reversed)
 
-	renderCWLGroup(scoredClans)
+	RenderCWLGroup(scoredClans)
 	return nil
 }
-func runCWLLayoutReport(client *CoCClient, cfg CWLLayoutConfig) error {
+func RunCWLLayoutReport(client *CoCClient, cfg CWLLayoutConfig) error {
 	group, err := client.GetCWLGroup(cfg.ClanTag)
 	if err != nil {
 		return fmt.Errorf("failed to fetch CWL group: %w", err)
@@ -148,7 +148,7 @@ func runCWLLayoutReport(client *CoCClient, cfg CWLLayoutConfig) error {
 			return cmp.Compare(a.Name, b.Name)
 		})
 
-		renderCWLLayout(clans, i+1, cfg.ClanTag, enemyTag)
+		RenderCWLLayout(clans, i+1, cfg.ClanTag, enemyTag)
 	}
 
 	return nil

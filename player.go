@@ -7,7 +7,7 @@ const (
 	maxLab       = 570
 )
 
-func (p *Player) calculateSums() {
+func (p *Player) CalculateSums() {
 	p.HeroSum = 0
 	p.EquipmentSum = 0
 	p.LabUpdates = 0
@@ -33,7 +33,7 @@ func (p *Player) calculateSums() {
 		}
 	}
 }
-func (p *Player) processAchievements() {
+func (p *Player) ProcessAchievements() {
 	for _, a := range p.Achievements {
 		switch a.Name {
 		case "Friend in Need":

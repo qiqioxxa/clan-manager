@@ -92,7 +92,7 @@ var rosterFormatters = map[RosterView]RosterFormatter{
 	},
 }
 
-func renderRoster(players []Player, view RosterView) {
+func RenderRoster(players []Player, view RosterView) {
 	formatter := rosterFormatters[view]
 
 	t := table.NewWriter()
@@ -111,7 +111,7 @@ func renderRoster(players []Player, view RosterView) {
 		fmt.Printf("Avg clan progression score: %d\n", totalScore/len(players))
 	}
 }
-func renderCWLGroup(clans []ScoredCWLClan) {
+func RenderCWLGroup(clans []ScoredCWLClan) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{
@@ -120,8 +120,10 @@ func renderCWLGroup(clans []ScoredCWLClan) {
 		"Stars",
 		"Attacks",
 		"Stars/atk",
-		"Score", "Listed",
-		"Present", "Tag",
+		"Score",
+		"Listed",
+		"Present",
+		"Tag",
 	})
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{
@@ -150,7 +152,7 @@ func renderCWLGroup(clans []ScoredCWLClan) {
 
 	t.Render()
 }
-func renderCWLLayout(clans []WarClanLayout, day int, ownTag, enemyTag string) {
+func RenderCWLLayout(clans []WarClanLayout, day int, ownTag, enemyTag string) {
 	fmt.Printf("=== DAY %d ===\n", day)
 
 	t := table.NewWriter()

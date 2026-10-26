@@ -31,7 +31,7 @@ type CWLLayoutConfig struct {
 	GlobalConfig
 }
 
-func parseFlags() (any, error) {
+func ParseFlags() (any, error) {
 	if len(os.Args) < 2 {
 		return nil, fmt.Errorf("expected subcommand: roster, cwlgroup, cwllayout")
 	}

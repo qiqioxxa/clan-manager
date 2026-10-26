@@ -70,7 +70,7 @@ func (client *CoCClient) GetScoredClan(clan CWLClan, teamSize int) (ScoredCWLCla
 		return ScoredCWLClan{}, fmt.Errorf("failed to fetch players info for %q: %w", clan.Name, err)
 	}
 
-	sortPlayers(players, ByScore, true, false)
+	SortPlayers(players, ByScore, true, false)
 
 	limit := min(teamSize, len(players))
 	if limit <= 0 {
@@ -186,8 +186,8 @@ func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, err
 				return
 			}
 
-			player.calculateSums()
-			player.processAchievements()
+			player.CalculateSums()
+			player.ProcessAchievements()
 
 			players[i] = player
 		})

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func sortPlayers(players []Player, sortColumn SortColumn, forCWL bool, reversed bool) {
+func SortPlayers(players []Player, sortColumn SortColumn, forCWL bool, reversed bool) {
 	slices.SortFunc(players, func(a, b Player) int {
 		var result int
 
@@ -47,7 +47,7 @@ func sortPlayers(players []Player, sortColumn SortColumn, forCWL bool, reversed 
 		return result
 	})
 }
-func sortClans(clans []ScoredCWLClan, sortColumn SortColumn, reversed bool) {
+func SortClans(clans []ScoredCWLClan, sortColumn SortColumn, reversed bool) {
 	slices.SortFunc(clans, func(a, b ScoredCWLClan) int {
 		var result int
 
