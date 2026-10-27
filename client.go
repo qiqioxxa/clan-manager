@@ -81,14 +81,14 @@ func (client *CoCClient) GetScoredClan(clan CWLClan, teamSize int) (ScoredCWLCla
 		}, nil
 	}
 
-	clanScore := 0
+	clanScore := 0.0
 	for j := range limit {
 		clanScore += players[j].Score(true)
 	}
 
 	return ScoredCWLClan{
 		CWLClan:        clan,
-		Score:          clanScore / limit,
+		Score:          clanScore / float64(limit),
 		PresentMembers: presentMembers,
 	}, nil
 }

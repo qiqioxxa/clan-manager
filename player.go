@@ -47,20 +47,20 @@ func (p *Player) ProcessAchievements() {
 	p.Achievements = nil
 }
 
-func (p Player) Score(forCWL bool) int {
+func (p Player) Score(forCWL bool) float64 {
 	if forCWL {
 		return p.clanWarLeagueScore()
 	} else {
 		return p.progressionScore()
 	}
 }
-func (p Player) progressionScore() int {
+func (p Player) progressionScore() float64 {
 	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
 	maxSum := maxHeroes*10 + maxEquipment*12 + maxLab*3
-	return int(float64(weightedSum) / float64(maxSum) * 1000)
+	return float64(weightedSum) / float64(maxSum) * 1000
 }
-func (p Player) clanWarLeagueScore() int {
-	weightedSum := p.progressionScore() + p.TownHall*100 + min(1000, p.WarLeagueStars)
+func (p Player) clanWarLeagueScore() float64 {
+	weightedSum := p.progressionScore() + float64(p.TownHall*100) + float64(min(1000, p.WarLeagueStars))
 	maxSum := 1000 + (maxTownHall * 100) + 1000
-	return int(float64(weightedSum) / float64(maxSum) * 1000)
+	return weightedSum / float64(maxSum) * 1000
 }

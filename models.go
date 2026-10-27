@@ -33,7 +33,7 @@ type WarMember struct {
 type ScoredCWLClan struct {
 	CWLClan
 	Rank           int
-	Score          int
+	Score          float64
 	Stars          int
 	Attacks        int
 	WinStars       int

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -62,7 +63,7 @@ var rosterFormatters = map[RosterView]RosterFormatter{
 				p.HeroSum,
 				p.EquipmentSum,
 				p.LabUpdates,
-				p.Score(false),
+				math.Round(p.Score(false)),
 			}
 		},
 	},
@@ -99,7 +100,7 @@ func RenderRoster(players []Player, view RosterView) {
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(formatter.Header)
 
-	totalScore := 0
+	totalScore := 0.0
 	for i, player := range players {
 		t.AppendRow(formatter.GenerateRow(i+1, player))
 		totalScore += player.Score(false)
@@ -108,7 +109,7 @@ func RenderRoster(players []Player, view RosterView) {
 	t.Render()
 
 	if view == ViewProgression && len(players) != 0 {
-		fmt.Printf("Avg clan progression score: %d\n", totalScore/len(players))
+		fmt.Printf("Avg clan progression score: %.2f\n", totalScore/float64(len(players)))
 	}
 }
 func RenderCWLGroup(clans []ScoredCWLClan) {
