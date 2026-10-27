@@ -52,8 +52,8 @@ func ParseFlags() (any, error) {
 		set.Var(&cfg.View, "view", "Roster view: all, progression, activity")
 		set.Var(&cfg.SortBy, "sort", "Sort column: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score")
 		set.BoolVar(&cfg.Reversed, "r", false, "Reverse sorting order")
-		set.BoolVar(&cfg.Snapshot, "snapshot", false, "Make a snapshot of current roster")
-		set.StringVar(&cfg.Diff, "diff", "", "Compare current roster with snapshot")
+		set.BoolVar(&cfg.Snapshot, "snapshot", false, "Create current roster snapshot")
+		set.StringVar(&cfg.Diff, "diff", "", "Compare current roster with a selected snapshot (depth or date in YYYY-MM-DD format)")
 
 		if err := set.Parse(subArgs); err != nil {
 			return nil, err
