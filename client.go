@@ -19,7 +19,7 @@ func NewCoCClient(token string) *CoCClient {
 	return &CoCClient{
 		token: token,
 		httpClient: &http.Client{
-			Timeout: 20 * time.Second,
+			Timeout: 10 * time.Second,
 		},
 		sem: make(chan struct{}, 10),
 	}
@@ -210,27 +210,44 @@ func (client *CoCClient) doRequest(endpoint string, target any) error {
 		return fmt.Errorf("failed to construct request URL: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+	const maxRetries = 5
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+client.token)
+
+		resp, err := client.httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("network request failed: %w", err)
+			time.Sleep(time.Duration(attempt) * time.Second)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("API request failed with status code: %s", resp.Status)
+			if resp.StatusCode >= http.StatusInternalServerError {
+				time.Sleep(time.Duration(attempt) * time.Second)
+				continue
+			}
+			return lastErr
+		}
+
+		err = json.NewDecoder(resp.Body).Decode(target)
+		resp.Body.Close()
+
+		if err != nil {
+			lastErr = fmt.Errorf("failed to decode JSON response: %w", err)
+			time.Sleep(time.Duration(attempt) * time.Second)
+			continue
+		}
+
+		return nil
 	}
 
-	req.Header.Set("Authorization", "Bearer "+client.token)
-
-	resp, err := client.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("network request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API request failed with status code: %s", resp.Status)
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(target)
-	if err != nil {
-		return fmt.Errorf("failed to decode JSON response: %w", err)
-	}
-
-	return nil
+	return fmt.Errorf("request failed after %d attempts: %w", maxRetries, lastErr)
 }
