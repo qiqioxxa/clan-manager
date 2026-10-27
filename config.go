@@ -44,10 +44,13 @@ func ParseFlags() (any, error) {
 		var cfg RosterConfig
 		set := flag.NewFlagSet("roster", flag.ExitOnError)
 
+		cfg.View = ViewAll
+		cfg.SortBy = ByScore
+
 		set.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
 		set.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
 		set.Var(&cfg.View, "view", "Roster view: all, progression, activity")
-		set.Var(&cfg.SortBy, "sort", "Sort column")
+		set.Var(&cfg.SortBy, "sort", "Sort column: name, th, herosum, equipsum, lab, cw, cwl, donations, clangames, capital, score")
 		set.BoolVar(&cfg.Reversed, "r", false, "Reverse sorting order")
 		set.BoolVar(&cfg.Snapshot, "snapshot", false, "Make a snapshot of current roster")
 		set.StringVar(&cfg.Diff, "diff", "", "Compare current roster with snapshot")
@@ -61,9 +64,11 @@ func ParseFlags() (any, error) {
 		var cfg CWLGroupConfig
 		set := flag.NewFlagSet("cwlgroup", flag.ExitOnError)
 
+		cfg.SortBy = ByScore
+
 		set.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
 		set.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
-		set.Var(&cfg.SortBy, "sort", "Sort column")
+		set.Var(&cfg.SortBy, "sort", "Sort column: name, listed, score, present, attacks, stars")
 		set.BoolVar(&cfg.Reversed, "r", false, "Reverse sorting order")
 
 		if err := set.Parse(subArgs); err != nil {
