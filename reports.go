@@ -5,10 +5,19 @@ import (
 	"fmt"
 	"slices"
 	"sync"
-	"time"
 )
 
 func RunRosterReport(client *CoCClient, cfg RosterConfig) error {
+	var clanSnapshot ClanSnapshot
+	var err error
+
+	if cfg.Diff != "" {
+		clanSnapshot, err = ResolveSnapshot(cfg.ClanTag, cfg.Diff)
+		if err != nil {
+			return fmt.Errorf("failed to find snapshot: %w", err)
+		}
+	}
+
 	clanMembers, err := client.GetClanMembers(cfg.ClanTag)
 	if err != nil {
 		return fmt.Errorf("failed to fetch clan data: %w", err)
@@ -28,14 +37,6 @@ func RunRosterReport(client *CoCClient, cfg RosterConfig) error {
 	}
 
 	if cfg.Diff != "" {
-		clanSnapshot, err := ResolveSnapshot(cfg.ClanTag, cfg.Diff)
-		if err != nil {
-			return fmt.Errorf("failed to find snapshot: %w", err)
-		}
-
-		timestampUTC, _ := time.Parse(time.RFC3339, clanSnapshot.Timestamp)
-		fmt.Printf("%v\n", timestampUTC.Local().Format(time.DateTime))
-
 		players = CalculateDiff(players, clanSnapshot)
 	}
 

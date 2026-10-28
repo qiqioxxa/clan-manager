@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -91,32 +92,101 @@ func ResolveSnapshot(clanTag, flagValue string) (ClanSnapshot, error) {
 		return strings.HasPrefix(e.Name(), ".")
 	})
 
-	depth, err := strconv.Atoi(flagValue)
-	if err != nil {
-		return ClanSnapshot{}, fmt.Errorf("invalid depth value: %w", err)
+	if len(files) == 0 {
+		return ClanSnapshot{}, fmt.Errorf("no snapshots found for clan %s", clanTag)
 	}
 
-	if depth <= 0 || depth > len(files) {
-		return ClanSnapshot{}, fmt.Errorf("entered depth out of range [1,%d]", len(files))
+	var filePath string
+	diffType, value := checkDiffType(flagValue)
+
+	switch diffType {
+	case TypeDepth:
+		depth := value.(int)
+		if depth <= 0 || depth > len(files) {
+			return ClanSnapshot{}, fmt.Errorf("entered depth out of range [1,%d]", len(files))
+		}
+
+		slices.SortFunc(files, func(a, b os.DirEntry) int {
+			return cmp.Compare(b.Name(), a.Name())
+		})
+
+		filePath = filepath.Join(dir, files[depth-1].Name())
+
+	case TypeDate:
+		inputDate := value.(time.Time)
+
+		var bestFile os.DirEntry
+		minOffset := math.MaxFloat64
+
+		for _, file := range files {
+			timestamp, err := time.Parse("2006-01-02_15-04-05", strings.TrimSuffix(file.Name(), ".json"))
+			if err != nil {
+				continue
+			}
+
+			offset := math.Abs(float64(inputDate.Unix() - timestamp.Unix()))
+			if offset < minOffset {
+				minOffset = offset
+				bestFile = file
+			}
+		}
+
+		if bestFile == nil {
+			return ClanSnapshot{}, fmt.Errorf("no valid snapshot found")
+		}
+
+		filePath = filepath.Join(dir, bestFile.Name())
+
+		if minOffset != 0 {
+			timestamp, _ := time.Parse("2006-01-02_15-04-05", strings.TrimSuffix(bestFile.Name(), ".json"))
+			fmt.Printf("Exact snapshot not found, used closest (%.2fd off): %v\n", minOffset/3600/24, timestamp.Local().Format(time.DateTime))
+		}
+
+	case TypeInvalid:
+		fallthrough
+	default:
+		return ClanSnapshot{}, fmt.Errorf("invalid -diff value (expected depth number or YYYY-MM-DD)")
 	}
 
-	slices.SortFunc(files, func(a, b os.DirEntry) int {
-		return cmp.Compare(b.Name(), a.Name())
-	})
-
-	path := filepath.Join(dir, files[depth-1].Name())
-	var snapshot ClanSnapshot
-
-	file, err := os.Open(path)
+	file, err := os.Open(filePath)
 	if err != nil {
-		return ClanSnapshot{}, fmt.Errorf("failed to open file %q: %w", files[depth-1].Name(), err)
+		return ClanSnapshot{}, fmt.Errorf("failed to open file %q: %w", filePath, err)
 	}
 	defer file.Close()
 
-	json.NewDecoder(file).Decode(&snapshot)
+	var snapshot ClanSnapshot
+	err = json.NewDecoder(file).Decode(&snapshot)
+	if err != nil {
+		return ClanSnapshot{}, fmt.Errorf("failed to decode snapshor JSON: %w", err)
+	}
 
 	return snapshot, nil
 }
+func checkDiffType(flagValue string) (diffType, any) {
+	timestamp, err := time.ParseInLocation("2006-01-02T15:04:05", flagValue, time.Local)
+	if err == nil {
+		return TypeDate, timestamp
+	}
+	timestamp, err = time.ParseInLocation(time.DateOnly, flagValue, time.Local)
+	if err == nil {
+		return TypeDate, timestamp
+	}
+
+	depth, err := strconv.Atoi(flagValue)
+	if err == nil {
+		return TypeDepth, depth
+	}
+
+	return TypeInvalid, nil
+}
+
+type diffType string
+
+const (
+	TypeDate    diffType = "DATE"
+	TypeDepth   diffType = "DEPTH"
+	TypeInvalid diffType = "INVALID"
+)
 
 func CalculateDiff(players []Player, clanSnapshot ClanSnapshot) []Player {
 	diffedPlayers := make([]Player, 0, len(players))
