@@ -68,7 +68,7 @@ func ParseFlags() (any, error) {
 
 		set.StringVar(&cfg.APIToken, "token", "", "Supercell API bearer token")
 		set.StringVar(&cfg.ClanTag, "tag", "", "Clan tag")
-		set.Var(&cfg.SortBy, "sort", "Sort column: name, listed, score, present, attacks, stars")
+		set.Var(&cfg.SortBy, "sort", "Sort column: name, stars, attacks, score, listed, present")
 		set.BoolVar(&cfg.Reversed, "r", false, "Reverse sorting order")
 
 		if err := set.Parse(subArgs); err != nil {
