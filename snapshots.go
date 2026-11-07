@@ -79,13 +79,13 @@ func SaveClanSnapshot(clanTag string, players []Player) error {
 	return nil
 }
 
-func ResolveSnapshot(clanTag, flagValue string) (ClanSnapshot, error) {
+func ResolveSnapshot(clanTag, flagValue string) (*ClanSnapshot, string, error) {
 	cleanTag := strings.TrimPrefix(clanTag, "#")
 	dir := filepath.Join("snapshots", cleanTag)
 
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		return ClanSnapshot{}, fmt.Errorf("failed to read snapshots directory: %w", err)
+		return nil, "", fmt.Errorf("failed to read snapshots directory: %w", err)
 	}
 
 	files = slices.DeleteFunc(files, func(e os.DirEntry) bool {
@@ -93,17 +93,18 @@ func ResolveSnapshot(clanTag, flagValue string) (ClanSnapshot, error) {
 	})
 
 	if len(files) == 0 {
-		return ClanSnapshot{}, fmt.Errorf("no snapshots found for clan %s", clanTag)
+		return nil, "", fmt.Errorf("no snapshots found for clan %s", clanTag)
 	}
 
 	var filePath string
+	var diffMsg string
 	diffType, value := checkDiffType(flagValue)
 
 	switch diffType {
 	case TypeDepth:
 		depth := value.(int)
 		if depth <= 0 || depth > len(files) {
-			return ClanSnapshot{}, fmt.Errorf("entered depth out of range [1,%d]", len(files))
+			return nil, "", fmt.Errorf("entered depth out of range [1,%d]", len(files))
 		}
 
 		slices.SortFunc(files, func(a, b os.DirEntry) int {
@@ -132,35 +133,41 @@ func ResolveSnapshot(clanTag, flagValue string) (ClanSnapshot, error) {
 		}
 
 		if bestFile == nil {
-			return ClanSnapshot{}, fmt.Errorf("no valid snapshot found")
+			return nil, "", fmt.Errorf("no valid snapshot found")
 		}
 
 		filePath = filepath.Join(dir, bestFile.Name())
 
-		if minOffset != 0 {
-			timestamp, _ := time.Parse("2006-01-02_15-04-05", strings.TrimSuffix(bestFile.Name(), ".json"))
-			fmt.Printf("Exact snapshot not found, used closest (%.2fd off): %v\n", minOffset/3600/24, timestamp.Local().Format(time.DateTime))
+		if minOffset >= 3600*12 {
+			diffMsg = fmt.Sprintf("Exact snapshot not found, closest (%.2fd off) used\n", minOffset/3600/24)
 		}
 
 	case TypeInvalid:
 		fallthrough
 	default:
-		return ClanSnapshot{}, fmt.Errorf("invalid -diff value (expected depth number or YYYY-MM-DD)")
+		return nil, "", fmt.Errorf("invalid -diff value (expected depth number or YYYY-MM-DD)")
 	}
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return ClanSnapshot{}, fmt.Errorf("failed to open file %q: %w", filePath, err)
+		return nil, "", fmt.Errorf("failed to open file %q: %w", filePath, err)
 	}
 	defer file.Close()
 
 	var snapshot ClanSnapshot
 	err = json.NewDecoder(file).Decode(&snapshot)
 	if err != nil {
-		return ClanSnapshot{}, fmt.Errorf("failed to decode snapshor JSON: %w", err)
+		return nil, "", fmt.Errorf("failed to decode snapshot JSON: %w", err)
 	}
 
-	return snapshot, nil
+	timestamp, err := time.ParseInLocation(time.RFC3339, snapshot.Timestamp, time.Local)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid snapshot timestamp format: %w", err)
+	}
+
+	diffMsg += fmt.Sprintf("Comparing with: %v\n", timestamp.Local().Format(time.DateTime))
+
+	return &snapshot, diffMsg, nil
 }
 func checkDiffType(flagValue string) (diffType, any) {
 	timestamp, err := time.ParseInLocation("2006-01-02T15:04:05", flagValue, time.Local)
@@ -169,7 +176,7 @@ func checkDiffType(flagValue string) (diffType, any) {
 	}
 	timestamp, err = time.ParseInLocation(time.DateOnly, flagValue, time.Local)
 	if err == nil {
-		return TypeDate, timestamp
+		return TypeDate, timestamp.Add(12 * time.Hour)
 	}
 
 	depth, err := strconv.Atoi(flagValue)
@@ -188,7 +195,7 @@ const (
 	TypeInvalid diffType = "INVALID"
 )
 
-func CalculateDiff(players []Player, clanSnapshot ClanSnapshot) []Player {
+func CalculateDiff(players []Player, clanSnapshot *ClanSnapshot) []Player {
 	diffedPlayers := make([]Player, 0, len(players))
 
 	for _, p := range players {

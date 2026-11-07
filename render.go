@@ -93,7 +93,7 @@ var rosterFormatters = map[RosterView]RosterFormatter{
 	},
 }
 
-func RenderRoster(players []Player, view RosterView) {
+func RenderRoster(players []Player, view RosterView, diffMsg string) {
 	formatter := rosterFormatters[view]
 
 	t := table.NewWriter()
@@ -105,6 +105,8 @@ func RenderRoster(players []Player, view RosterView) {
 		t.AppendRow(formatter.GenerateRow(i+1, player))
 		totalScore += player.Score(false)
 	}
+
+	fmt.Print(diffMsg)
 
 	t.Render()
 
@@ -144,7 +146,7 @@ func RenderCWLGroup(clans []ScoredCWLClan) {
 			clan.Stars + clan.WinStars,
 			clan.Attacks,
 			fmt.Sprintf("%.2f", avgStars),
-			clan.Score,
+			math.Round(clan.Score),
 			len(clan.ListedMembers),
 			len(clan.PresentMembers),
 			clan.Tag,

@@ -25,32 +25,32 @@ func NewCoCClient(token string) *CoCClient {
 	}
 }
 
-func (client *CoCClient) GetCWLGroup(clanTag string) (CWLGroup, error) {
+func (client *CoCClient) GetCWLGroup(clanTag string) (*CWLGroup, error) {
 	var group CWLGroup
 	endpoint := fmt.Sprintf("v1/clans/%s/currentwar/leaguegroup", clanTag)
 
 	err := client.doRequest(endpoint, &group)
 	if err != nil {
-		return CWLGroup{}, err
+		return nil, err
 	}
 
-	return group, nil
+	return &group, nil
 }
-func (client *CoCClient) GetWar(warTag string) (War, error) {
+func (client *CoCClient) GetWar(warTag string) (*War, error) {
 	var war War
 	endpoint := fmt.Sprintf("v1/clanwarleagues/wars/%s", warTag)
 
 	err := client.doRequest(endpoint, &war)
 	if err != nil {
-		return War{}, err
+		return nil, err
 	}
 
-	return war, nil
+	return &war, nil
 }
-func (client *CoCClient) GetScoredClan(clan CWLClan, teamSize int) (ScoredCWLClan, error) {
+func (client *CoCClient) GetScoredClan(clan CWLClan, teamSize int) (*ScoredCWLClan, error) {
 	currentMembers, err := client.GetClanMembers(clan.Tag)
 	if err != nil {
-		return ScoredCWLClan{}, fmt.Errorf("failed to fetch current members of clan %q: %w", clan.Name, err)
+		return nil, fmt.Errorf("failed to fetch current members of clan %q: %w", clan.Name, err)
 	}
 
 	inClan := make(map[string]bool, len(currentMembers))
@@ -67,14 +67,14 @@ func (client *CoCClient) GetScoredClan(clan CWLClan, teamSize int) (ScoredCWLCla
 
 	players, err := client.GetPlayersInfo(presentMembers)
 	if err != nil {
-		return ScoredCWLClan{}, fmt.Errorf("failed to fetch players info for %q: %w", clan.Name, err)
+		return nil, fmt.Errorf("failed to fetch players info for %q: %w", clan.Name, err)
 	}
 
 	SortPlayers(players, ByScore, true, false)
 
 	limit := min(teamSize, len(players))
 	if limit <= 0 {
-		return ScoredCWLClan{
+		return &ScoredCWLClan{
 			CWLClan:        clan,
 			Score:          0,
 			PresentMembers: presentMembers,
@@ -86,7 +86,7 @@ func (client *CoCClient) GetScoredClan(clan CWLClan, teamSize int) (ScoredCWLCla
 		clanScore += players[j].Score(true)
 	}
 
-	return ScoredCWLClan{
+	return &ScoredCWLClan{
 		CWLClan:        clan,
 		Score:          clanScore / float64(limit),
 		PresentMembers: presentMembers,
@@ -119,7 +119,7 @@ func (client *CoCClient) GetCWLWarStats(rounds []Round) (map[string]WarStats, er
 				mu.Unlock()
 				return
 			}
-			wars[i] = war
+			wars[i] = *war
 		})
 	}
 
@@ -231,7 +231,7 @@ func (client *CoCClient) doRequest(endpoint string, target any) error {
 			resp.Body.Close()
 			lastErr = fmt.Errorf("API request failed with status code: %s", resp.Status)
 			if resp.StatusCode >= http.StatusInternalServerError {
-				time.Sleep(time.Duration(attempt) * time.Second)
+			time.Sleep(time.Duration(attempt) * time.Second)
 				continue
 			}
 			return lastErr

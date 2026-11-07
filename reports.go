@@ -8,11 +8,12 @@ import (
 )
 
 func RunRosterReport(client *CoCClient, cfg RosterConfig) error {
-	var clanSnapshot ClanSnapshot
+	var clanSnapshot *ClanSnapshot
+	var diffMsg string
 	var err error
 
 	if cfg.Diff != "" {
-		clanSnapshot, err = ResolveSnapshot(cfg.ClanTag, cfg.Diff)
+		clanSnapshot, diffMsg, err = ResolveSnapshot(cfg.ClanTag, cfg.Diff)
 		if err != nil {
 			return fmt.Errorf("failed to find snapshot: %w", err)
 		}
@@ -33,7 +34,6 @@ func RunRosterReport(client *CoCClient, cfg RosterConfig) error {
 		if err != nil {
 			return fmt.Errorf("failed to create a snapshot: %w", err)
 		}
-		return nil
 	}
 
 	if cfg.Diff != "" {
@@ -42,7 +42,7 @@ func RunRosterReport(client *CoCClient, cfg RosterConfig) error {
 
 	SortPlayers(players, cfg.SortBy, false, cfg.Reversed)
 
-	RenderRoster(players, cfg.View)
+	RenderRoster(players, cfg.View, diffMsg)
 	return nil
 }
 func RunCWLGroupReport(client *CoCClient, cfg CWLGroupConfig) error {
@@ -74,7 +74,7 @@ func RunCWLGroupReport(client *CoCClient, cfg CWLGroupConfig) error {
 				mu.Unlock()
 				return
 			}
-			scoredClans[i] = scoredClan
+			scoredClans[i] = *scoredClan
 		})
 	}
 
