@@ -2,12 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"sync"
 	"time"
 )
+
+var ErrNotFound = errors.New("API request failed with status code: 404 Not Found")
 
 type CoCClient struct {
 	token      string
@@ -181,6 +185,9 @@ func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, err
 
 			err := client.doRequest(endpoint, &player)
 			if err != nil {
+				if errors.Is(err, ErrNotFound) {
+					return
+				}
 				mu.Lock()
 				if firstErr == nil {
 					firstErr = fmt.Errorf("failed to fetch player %s: %w", member.Tag, err)
@@ -201,6 +208,10 @@ func (client *CoCClient) GetPlayersInfo(clanMembers []ClanMember) ([]Player, err
 	if firstErr != nil {
 		return nil, firstErr
 	}
+
+	players = slices.DeleteFunc(players, func(p Player) bool {
+		return p.TownHall == 0
+	})
 
 	return players, nil
 }
@@ -226,15 +237,18 @@ func (client *CoCClient) doRequest(endpoint string, target any) error {
 		resp, err := client.httpClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("network request failed: %w", err)
-			time.Sleep(time.Duration(attempt) * time.Second)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
+			if resp.StatusCode == http.StatusNotFound {
+				return ErrNotFound
+			}
 			lastErr = fmt.Errorf("API request failed with status code: %s", resp.Status)
 			if resp.StatusCode >= http.StatusInternalServerError {
-			time.Sleep(time.Duration(attempt) * time.Second)
+				time.Sleep(100 * time.Millisecond)
 				continue
 			}
 			return lastErr
@@ -245,7 +259,7 @@ func (client *CoCClient) doRequest(endpoint string, target any) error {
 
 		if err != nil {
 			lastErr = fmt.Errorf("failed to decode JSON response: %w", err)
-			time.Sleep(time.Duration(attempt) * time.Second)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
