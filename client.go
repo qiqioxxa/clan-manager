@@ -132,11 +132,14 @@ func (client *CoCClient) GetCWLWarStats(rounds []Round) (map[string]WarStats, er
 	warStats := make(map[string]WarStats)
 
 	for _, war := range wars {
+		clanStars, clanPercents := war.Clan.Stars, war.Clan.Percents
+		oppStars, oppPercents := war.Opponent.Stars, war.Opponent.Percents
+
 		clanStats := warStats[war.Clan.Tag]
 		clanStats.TeamSize = war.TeamSize
 		clanStats.Attacks += war.Clan.Attacks
 		clanStats.Stars += war.Clan.Stars
-		if war.Clan.Stars > war.Opponent.Stars {
+		if war.State == "warEnded" && (clanStars > oppStars || clanStars == oppStars && clanPercents > oppPercents) {
 			clanStats.WinStars += 10
 		}
 		warStats[war.Clan.Tag] = clanStats
@@ -145,7 +148,7 @@ func (client *CoCClient) GetCWLWarStats(rounds []Round) (map[string]WarStats, er
 		oppStats.TeamSize = war.TeamSize
 		oppStats.Attacks += war.Opponent.Attacks
 		oppStats.Stars += war.Opponent.Stars
-		if war.Opponent.Stars > war.Clan.Stars {
+		if war.State == "warEnded" && (oppStars > clanStars || oppStars == clanStars && oppPercents > clanPercents) {
 			oppStats.WinStars += 10
 		}
 		warStats[war.Opponent.Tag] = oppStats

@@ -16,15 +16,17 @@ type Round struct {
 	WarTags [4]string `json:"warTags"`
 }
 type War struct {
+	State    string  `json:"state"`
 	TeamSize int     `json:"teamSize"`
 	Clan     WarClan `json:"clan"`
 	Opponent WarClan `json:"opponent"`
 }
 type WarClan struct {
 	Clan
-	Attacks int         `json:"attacks"`
-	Stars   int         `json:"stars"`
-	Members []WarMember `json:"members"`
+	Attacks  int         `json:"attacks"`
+	Stars    int         `json:"stars"`
+	Percents float64     `json:"destructionPercentage"`
+	Members  []WarMember `json:"members"`
 }
 type WarMember struct {
 	Tag      string `json:"tag"`
