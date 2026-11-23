@@ -1,10 +1,10 @@
 package main
 
 const (
-	maxTownHall  = 18
-	maxHeroes    = 480
-	maxEquipment = 324
-	maxLab       = 570
+	maxTownHall  = 19
+	maxHeroes    = 510
+	maxEquipment = 396
+	maxLab       = 638
 )
 
 func (p *Player) CalculateSums() {
@@ -55,12 +55,8 @@ func (p Player) Score(forCWL bool) float64 {
 	}
 }
 func (p Player) progressionScore() float64 {
-	weightedSum := p.HeroSum*10 + p.EquipmentSum*12 + p.LabUpdates*3
-	maxSum := maxHeroes*10 + maxEquipment*12 + maxLab*3
-	return float64(weightedSum) / float64(maxSum) * 1000
+	return (0.50*float64(p.HeroSum)/maxHeroes + 0.35*float64(p.EquipmentSum)/maxEquipment + 0.15*float64(p.LabUpdates)/maxLab) * 1000
 }
 func (p Player) clanWarLeagueScore() float64 {
-	weightedSum := p.progressionScore() + float64(p.TownHall*100) + float64(min(1000, p.WarLeagueStars))
-	maxSum := 1000 + (maxTownHall * 100) + 1000
-	return weightedSum / float64(maxSum) * 1000
+	return (0.20*p.progressionScore()/1000 + 0.50*float64(p.TownHall)/maxTownHall + 0.30*float64(min(1000, p.WarLeagueStars))/1000) * 1000
 }
