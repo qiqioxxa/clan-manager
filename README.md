@@ -5,7 +5,7 @@ A lightweight Go CLI tool for Clash of Clans clan management and roster analytic
 ## Building
 
 ### Requirements
-- Go 1.22+ compiler
+- Go 1.25+ compiler
 
 ### Compilation
 ```bash
@@ -13,6 +13,19 @@ git clone https://github.com/qiqioxxa/clan-manager.git
 cd clan-manager
 go build -o clan-manager .
 ```
+
+---
+
+## API authentication
+
+Pass a Supercell API token with `-token`, or omit it and configure developer portal credentials in `.env`:
+
+```dotenv
+COC_DEV_EMAIL=you@example.com
+COC_DEV_PASSWORD=your-password
+```
+
+You can copy `.env.example` as a starting point. When no `-token` is provided, the CLI logs in to [developer.clashofclans.com](https://developer.clashofclans.com), reuses a token for the current IP if available, or creates one. If a supplied API token receives `403 Forbidden`, the CLI attempts to refresh it using .env credentials.
 
 ---
 
