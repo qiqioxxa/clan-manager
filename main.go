@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"log"
 )
 
@@ -13,16 +13,28 @@ func main() {
 
 	switch cfg := parsedCfg.(type) {
 	case RosterConfig:
-		client := NewCoCClient(cfg.APIToken)
-		err = RunRosterReport(client, cfg)
+		client, clientErr := newClient(cfg.APIToken)
+		if clientErr != nil {
+			err = clientErr
+		} else {
+			err = RunRosterReport(client, cfg)
+		}
 	case CWLGroupConfig:
-		client := NewCoCClient(cfg.APIToken)
-		err = RunCWLGroupReport(client, cfg)
+		client, clientErr := newClient(cfg.APIToken)
+		if clientErr != nil {
+			err = clientErr
+		} else {
+			err = RunCWLGroupReport(client, cfg)
+		}
 	case CWLLayoutConfig:
-		client := NewCoCClient(cfg.APIToken)
-		err = RunCWLLayoutReport(client, cfg)
+		client, clientErr := newClient(cfg.APIToken)
+		if clientErr != nil {
+			err = clientErr
+		} else {
+			err = RunCWLLayoutReport(client, cfg)
+		}
 	default:
-		err = fmt.Errorf("Unknown configuration type")
+		err = errors.New("unknown configuration type")
 	}
 
 	if err != nil {

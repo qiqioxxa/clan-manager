@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -14,19 +16,57 @@ import (
 var ErrNotFound = errors.New("API request failed with status code: 404 Not Found")
 
 type CoCClient struct {
+	developer  *CoCDeveloperClient
 	token      string
+	tokenMu    sync.RWMutex
+	refreshMu  sync.Mutex
+	refreshErr error
 	httpClient *http.Client
 	sem        chan struct{}
 }
 
-func NewCoCClient(token string) *CoCClient {
+func NewCoCClient(developer *CoCDeveloperClient, token string) *CoCClient {
 	return &CoCClient{
-		token: token,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
-		sem: make(chan struct{}, 10),
+		developer:  developer,
+		token:      token,
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+		sem:        make(chan struct{}, 10),
 	}
+}
+
+func (client *CoCClient) getToken() string {
+	client.tokenMu.RLock()
+	defer client.tokenMu.RUnlock()
+	return client.token
+}
+
+func (client *CoCClient) refreshToken(used string) error {
+	client.refreshMu.Lock()
+	defer client.refreshMu.Unlock()
+
+	currToken := client.getToken()
+	if currToken != used {
+		return nil
+	}
+	if client.refreshErr != nil {
+		return client.refreshErr
+	}
+	if client.developer == nil {
+		client.refreshErr = errors.New("no credentials for key refresh")
+		return client.refreshErr
+	}
+
+	token, err := client.developer.APITokenForCurrentIP()
+	if err != nil {
+		client.refreshErr = err
+		return client.refreshErr
+	}
+
+	client.tokenMu.Lock()
+	client.token = token
+	client.tokenMu.Unlock()
+
+	return nil
 }
 
 func (client *CoCClient) GetCWLGroup(clanTag string) (*CWLGroup, error) {
@@ -226,13 +266,15 @@ func (client *CoCClient) doRequest(endpoint string, target any) error {
 
 	const maxRetries = 5
 	var lastErr error
+	refreshed := false
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
+		used := client.getToken()
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create request: %w", err)
 		}
-		req.Header.Set("Authorization", "Bearer "+client.token)
+		req.Header.Set("Authorization", "Bearer "+used)
 
 		resp, err := client.httpClient.Do(req)
 		if err != nil {
@@ -242,11 +284,24 @@ func (client *CoCClient) doRequest(endpoint string, target any) error {
 		}
 
 		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
+
 			if resp.StatusCode == http.StatusNotFound {
 				return ErrNotFound
 			}
-			lastErr = fmt.Errorf("API request failed with status code: %s", resp.Status)
+			msg := strings.TrimSpace(string(body))
+
+			if resp.StatusCode == http.StatusForbidden && !refreshed {
+				refreshed = true
+				refreshErr := client.refreshToken(used)
+				if refreshErr != nil {
+					return fmt.Errorf("key refresh failed: %w", refreshErr)
+				}
+				continue
+			}
+
+			lastErr = fmt.Errorf("API request failed with status code: %s: %s", resp.Status, msg)
 			if resp.StatusCode >= http.StatusInternalServerError {
 				time.Sleep(100 * time.Millisecond)
 				continue

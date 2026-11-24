@@ -2,7 +2,10 @@ module github.com/qiqioxxa/clan-manager
 
 go 1.26.3
 
-require github.com/jedib0t/go-pretty/v6 v6.8.3
+require (
+	github.com/jedib0t/go-pretty/v6 v6.8.3
+	github.com/joho/godotenv v1.5.1
+)
 
 require (
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
